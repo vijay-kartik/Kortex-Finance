@@ -1,0 +1,104 @@
+import Testing
+@testable import KortexFinance
+
+private func day(_ y: Int, _ m: Int, _ d: Int) -> LocalDay { LocalDay(year: y, month: m, day: d)! }
+
+private func tx(_ uid: String, _ type: TransactionType, _ amount: Int64, on: LocalDay, account: String = "bank",
+                category: String? = nil, recurring: String? = nil, dueOn: LocalDay? = nil, statement: String? = nil) -> Transaction {
+    Transaction(uid: uid, type: type, amountMinor: amount, currency: "INR", occurredAtMillis: 0, occurredOn: on,
+                accountUid: account, toAccountUid: nil, categoryUid: category, merchant: nil, payeeKey: nil, note: nil,
+                source: .manual, sourceRef: nil, recurringUid: recurring, dueOn: dueOn, statementUid: statement,
+                receipt: nil, createdAtMillis: 0, updatedAtMillis: 0)
+}
+
+private func monthly(_ uid: String, anchor: Int, next: LocalDay, amount: Int64 = 64_900, kind: RecurringKind = .subscription) -> Recurring {
+    Recurring(uid: uid, name: uid, kind: kind, amountMinor: amount, currency: "INR", frequency: .monthly, interval: 1,
+              anchorDay: anchor, nextDueOn: next, accountUid: "card", categoryUid: nil, remindDaysBefore: -1,
+              autoMarkPaid: false, paused: false, createdAtMillis: 0, updatedAtMillis: 0)
+}
+
+struct CalendarTests {
+    @Test func monthArithmeticAndClamping() {
+        #expect(YearMonth(year: 2026, month: 1).adding(months: -1) == YearMonth(year: 2025, month: 12))
+        #expect(YearMonth(year: 2026, month: 2).lengthOfMonth == 28)
+        #expect(YearMonth(year: 2026, month: 9).day(31) == day(2026, 9, 30))
+        #expect(day(2026, 9, 29).adding(days: 3) == day(2026, 10, 2))
+        #expect(day(2026, 10, 1).isoWeekday == 4, "1 Oct 2026 is a Thursday")
+        #expect(day(2026, 9, 29).days(to: day(2026, 10, 6)) == 7)
+    }
+}
+
+struct CalcTests {
+    @Test func percentsAlwaysAddUpTo100() {
+        #expect(roundedPercents([1, 1, 1]) == [34, 33, 33])
+        #expect(roundedPercents([0, 0]) == [0, 0])
+        #expect(roundedPercents([124_050, 60_400, 50_900, 47_700, 35_000]).reduce(0, +) == 100)
+    }
+
+    @Test func monthToDateComparesTheSameDayOfLastMonth() {
+        let txs = [
+            tx("a", .expense, 1_000, on: day(2026, 9, 3)),
+            tx("b", .expense, 9_000, on: day(2026, 9, 30)),   // after day 29: not counted
+            tx("c", .expense, 2_000, on: day(2026, 10, 2)),
+        ]
+        let mtd = Spending.monthToDate(txs, today: day(2026, 10, 29))
+        #expect(mtd.thisMonthMinor == 2_000)
+        #expect(mtd.lastMonthMinor == 1_000)
+        #expect(mtd.deltaMinor == 1_000)
+    }
+
+    @Test func onlyExpensesAreSpendingAndOnlyIncomeIsIncome() {
+        let txs = [
+            tx("o", .opening, 100_000, on: day(2026, 9, 1)),
+            tx("i", .income, 542_000, on: day(2026, 9, 1)),
+            tx("e", .expense, 318_050, on: day(2026, 9, 2)),
+            tx("p", .cardPayment, 140_000, on: day(2026, 9, 3)),
+            tx("t", .transfer, 5_000, on: day(2026, 9, 4)),
+        ]
+        let flow = Spending.monthlyFlows(txs, endMonth: YearMonth(year: 2026, month: 9)).last!
+        #expect(flow.inMinor == 542_000)
+        #expect(flow.outMinor == 318_050)
+        #expect(flow.keptPercent == 41)
+    }
+
+    @Test func whereItWentKeepsTopCategoriesAndFoldsTheRestIntoOther() {
+        let cats = Dictionary(uniqueKeysWithValues: BuiltInCategories.all.map { ($0.uid, $0) })
+        let txs = [
+            tx("1", .expense, 500, on: day(2026, 9, 1), category: "food"),
+            tx("2", .expense, 300, on: day(2026, 9, 1), category: "travel"),
+            tx("3", .expense, 200, on: day(2026, 9, 1), category: nil),
+            tx("4", .expense, 100, on: day(2026, 9, 1), category: "deleted-category"),
+        ]
+        let shares = Spending.whereItWent(txs, categories: cats, from: day(2026, 9, 1), to: day(2026, 9, 30), top: 1)
+        #expect(shares.map(\.category?.uid) == ["food", nil])
+        #expect(shares.map(\.amountMinor) == [500, 600])
+        #expect(shares.map(\.percent).reduce(0, +) == 100)
+    }
+
+    @Test func monthlyRecurringKeepsItsAnchorDay() {
+        let rent = monthly("rent", anchor: 31, next: day(2026, 8, 31))
+        #expect(RecurringSchedule.nextAfter(rent, day(2026, 8, 31)) == day(2026, 9, 30))
+        #expect(RecurringSchedule.nextAfter(rent, day(2026, 9, 30)) == day(2026, 10, 31))
+    }
+
+    @Test func pendingSkipsPaidOccurrencesAndPaidBills() {
+        let today = day(2026, 9, 29)
+        let netflix = monthly("netflix", anchor: 3, next: day(2026, 10, 3))
+        let gym = monthly("gym", anchor: 5, next: day(2026, 10, 5), amount: 150_000, kind: .fixed)
+        let statement = CardStatement(uid: "s1", cardUid: "card", periodStart: day(2026, 8, 26), statementOn: day(2026, 9, 25),
+                                      dueOn: day(2026, 10, 15), totalDueMinor: 140_000, minDueMinor: 20_000, source: .auto,
+                                      createdAtMillis: 0, updatedAtMillis: 0)
+        let txs = [
+            tx("paid-gym", .expense, 150_000, on: day(2026, 9, 28), recurring: "gym", dueOn: day(2026, 10, 5)),
+            tx("part", .cardPayment, 40_000, on: day(2026, 9, 28), statement: "s1"),
+        ]
+        let summary = Pending.summary(today: today, statements: [statement], recurring: [netflix, gym], transactions: txs)
+        #expect(summary.items.map(\.sourceUid) == ["netflix", "s1"])
+        #expect(summary.cardBillsMinor == 100_000)
+        #expect(summary.items.last?.minDueMinor == 0)
+        #expect(summary.totalMinor == 164_900)
+        #expect(Pending.urgency(day(2026, 10, 3), today: today) == .soon)
+        #expect(Pending.urgency(day(2026, 10, 15), today: today) == .later)
+        #expect(Pending.urgency(day(2026, 9, 28), today: today) == .overdue)
+    }
+}

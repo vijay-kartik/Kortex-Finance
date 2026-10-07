@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Kortex",
+      "type": "shell",
+      "command": "scripts/build.sh",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Run Kortex",
+      "type": "shell",
+      "command": "scripts/run.sh",
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Test KortexKit",
+      "type": "shell",
+      "command": "xcrun swift test --package-path Packages/KortexKit",
+      "group": "test",
+      "problemMatcher": ["$swiftc"]
+    }
+  ]
+}

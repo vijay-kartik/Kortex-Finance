@@ -1,0 +1,63 @@
+# XcodeGen spec. `xcodegen` (or scripts/build.sh) creates Kortex.xcodeproj, which is not committed.
+name: Kortex
+options:
+  bundleIdPrefix: dev.kortex
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  KortexKit:
+    path: Packages/KortexKit
+
+targets:
+  Kortex:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - package: KortexKit
+    # scripts/build.sh writes this from App/GoogleService-Info.plist (GOOGLE_REVERSED_CLIENT_ID).
+    configFiles:
+      Debug: App/Generated.xcconfig
+      Release: App/Generated.xcconfig
+    # XcodeGen writes App/Kortex.entitlements from these; edit them here, not in the file.
+    entitlements:
+      path: App/Kortex.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        # Read receipts you choose; save exported report PDFs.
+        com.apple.security.files.user-selected.read-write: true
+        # Firebase Auth and GoogleSignIn keep the session in the keychain.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.kortex.mac
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Kortex
+        LSApplicationCategoryType: public.app-category.finance
+        # Google sign-in returns to the app on this scheme.
+        CFBundleURLTypes:
+          - CFBundleURLName: GoogleSignIn
+            CFBundleURLSchemes:
+              - $(GOOGLE_REVERSED_CLIENT_ID)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.kortex.mac
+        PRODUCT_NAME: Kortex
+        ENABLE_HARDENED_RUNTIME: YES
+        # Synapse, so native selection (sidebar, focus rings) is Kortex purple rather than system blue.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Rendered from Figma by scripts/app-icon/generate.swift.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: 7CB2TRZYZ6

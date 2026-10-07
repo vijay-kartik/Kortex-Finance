@@ -1,0 +1,9 @@
+.DS_Store
+.build/
+.swiftpm/
+Kortex.xcodeproj/
+xcuserdata/
+DerivedData/
+# Firebase app config: download from the Firebase console, never commit.
+GoogleService-Info.plist
+App/Generated.xcconfig
