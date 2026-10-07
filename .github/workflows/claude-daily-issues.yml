@@ -1,0 +1,183 @@
+name: Claude issue agent
+
+on:
+  schedule:
+    # Every 4 hours, 6 runs a day, first one at 04:00 IST:
+    # 04:00 08:00 12:00 16:00 20:00 00:00 IST = 22:30 02:30 06:30 10:30 14:30 18:30 UTC.
+    - cron: "30 2-22/4 * * *"
+  workflow_dispatch: # lets you trigger a run by hand from the Actions tab
+    inputs:
+      area:
+        description: "Focus area number from focus.md (leave empty to use the rotation)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-daily-issues
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Personal access token for vijay-kartik/Kortex-Finance, stored as the GH_PAT repository secret.
+      # Falls back to the built-in workflow token when the secret is not set.
+      GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+          fetch-depth: 50 # recent history so Claude can look at the last week of commits
+
+      - name: Check out the Android app for reference
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: vijay-kartik/Kortex
+          token: ${{ secrets.GH_PAT || github.token }}
+          path: .android
+          fetch-depth: 1
+
+      - name: Pick focus area and ensure labels exist
+        id: pick
+        env:
+          AREA_OVERRIDE: ${{ inputs.area }}
+        run: |
+          focus=.github/issue-agent/focus.md
+          mapfile -t titles < <(grep -E '^[0-9]+\. \*\*[^*]+\*\*' "$focus" | sed -E 's/^[0-9]+\. \*\*([^*]+)\*\*.*/\1/')
+          count=${#titles[@]}
+          if [ "$count" -eq 0 ]; then echo "No focus areas found in $focus"; exit 1; fi
+
+          if [ -n "$AREA_OVERRIDE" ]; then
+            n=$AREA_OVERRIDE
+          else
+            # One slot per 4-hour block, with blocks starting at 02:00, 06:00, ... UTC just before
+            # each scheduled run, so a run GitHub starts late still lands in its own slot.
+            # Consecutive runs walk down the list, and the rotation carries on across days
+            # instead of restarting at area 1 each morning.
+            n=$(( ($(date -u +%s) + 7200) / 14400 % count + 1 ))
+          fi
+          if [ "$n" -lt 1 ] || [ "$n" -gt "$count" ]; then echo "Area must be between 1 and $count"; exit 1; fi
+
+          gh label create claude-audit --color 7057ff --description "Filed by the Claude issue agent" --force
+          list=""
+          for i in "${!titles[@]}"; do
+            slug=$(echo "${titles[$i]}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+            gh label create "area:$slug" --color c5def5 --force
+            list+="$((i + 1)). ${titles[$i]} (label: area:${slug})"$'\n'
+          done
+
+          echo "Focus area for this run: $n. ${titles[$((n - 1))]}"
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+          echo "title=${titles[$((n - 1))]}" >> "$GITHUB_OUTPUT"
+          { echo "list<<EOF"; printf '%s' "$list"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Export Figma file for the design-system area
+        if: contains(steps.pick.outputs.title, 'Design')
+        continue-on-error: true
+        env:
+          FIGMA_TOKEN: ${{ secrets.FIGMA_TOKEN }}
+        run: |
+          if [ -z "$FIGMA_TOKEN" ]; then echo "FIGMA_TOKEN secret not set; skipping Figma export"; exit 0; fi
+          key=$(grep -oE 'figma\.com/(design|file)/[A-Za-z0-9]+' .github/issue-agent/focus.md | head -1 | cut -d/ -f3)
+          if [ -z "$key" ]; then echo "No Figma link in focus.md; skipping"; exit 0; fi
+          mkdir -p .figma-export
+          curl -sSf -H "X-Figma-Token: $FIGMA_TOKEN" "https://api.figma.com/v1/files/$key" -o .figma-export/file.json
+          echo "Exported Figma file $key ($(du -h .figma-export/file.json | cut -f1))"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Use ONE of these. The OAuth token bills your Claude Pro/Max plan
+          # (create it with `claude setup-token`); the API key bills the Anthropic API.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT || github.token }}
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 50
+            --allowedTools "Read,Glob,Grep,Write,Bash(jq:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh search issues:*)"
+          prompt: |
+            You are auditing Kortex for Mac (${{ github.repository }}): a native SwiftUI macOS app
+            (Swift 6, macOS 14+). `App/` is a thin app target; everything else lives in the
+            `Packages/KortexKit` Swift package (`KortexFinance` plain models, calculators and write
+            rules; `KortexCloud` Firebase sign-in and sync; `KortexAI` the AI Gateway client;
+            `KortexKit` screens and theme). This workflow runs every 4 hours, and each run files
+            exactly ONE GitHub issue. You cannot build or run the app; do not try to run Swift or
+            Xcode.
+
+            The Android app (vijay-kartik/Kortex) shares the Firebase project, and its Firestore
+            document shapes are the contract this app follows. If `.android/` exists it is a
+            read-only checkout of that repository, for reference only (see its
+            `sync/finance/FinanceDocs.kt`, `FinanceSync.kt` and `domain/calc/`). Never file issues
+            against the Android code.
+
+            This run's focus area: **${{ steps.pick.outputs.number }}. ${{ steps.pick.outputs.title }}**
+
+            All focus areas, in rotation order, with the label to use for each:
+            ${{ steps.pick.outputs.list }}
+
+            1. Read `.github/issue-agent/focus.md` for the full description of this run's focus
+               area and for what is out of scope. Read `README.md` so you understand the
+               intended design before judging the code.
+
+            2. Load what has already been filed:
+               `gh issue list --label claude-audit --state all --limit 300 --json number,title,state,labels,body`
+               Never file a duplicate or near-duplicate of any of these, open or closed.
+               A closed issue means the owner either fixed it or rejected it; do not refile it.
+               Look at which targets earlier issues in this area covered, and go somewhere else.
+
+            3. Look for one confirmed, worthwhile issue in this run's focus area. Start with what
+               changed recently (`git log --since="7 days ago" --stat`, then `git show` the
+               interesting commits), then go wider. Verify the finding by reading the actual code
+               paths involved; do not report something you have not confirmed.
+
+            4. If, after a genuine search, there is nothing in this area worth filing that is not
+               already filed, skip it and move to the next area in the list (wrapping from the
+               last back to 1). Keep going until you find an issue or have tried every area.
+               Do not spend your whole budget on one area.
+
+            5. File exactly one issue, with `claude-audit` plus the label of the area it actually
+               belongs to (which may differ from the assigned area if you skipped):
+               `gh issue create --title "<concise title>" --label claude-audit --label "area:<slug>" --body-file <file>`
+               Write the body to a temp file first. Body format:
+
+               ## Problem
+               What is wrong, in 1–3 sentences.
+
+               ## Evidence
+               Specific `path/to/File.swift:line` references with short code excerpts.
+
+               ## Impact
+               What a user or developer actually experiences, and how likely it is.
+
+               ## Suggested fix
+               Concrete steps; name the files to change.
+
+               ## Acceptance criteria
+               - [ ] Checkable conditions that mean this is done.
+
+               For a feature request or improvement, use these headings instead:
+               Motivation, Current behaviour (with file references), Proposal, Acceptance criteria.
+
+            Area-specific notes:
+            - Design system: if `.figma-export/file.json` exists, it is the Figma file exported
+              through the Figma REST API. It can be large, so explore it with `jq` and Grep
+              rather than reading it whole; the Mac frames are on the page
+              "Kortex - Finances (Mac OS)". Compare colours, typography, spacing, corner radii
+              and component structure in the SwiftUI code against it and against the theme in
+              `Packages/KortexKit/Sources/KortexKit/Theme`. If the file does not exist, check
+              that views use the theme's tokens and shared components instead of hardcoded values.
+            - Android parity: cite both sides, the Swift file and the Android file it should
+              match, with the exact field or rule that differs.
+            - Code duplication: only report duplication whose removal keeps the code at least as
+              readable as it is now.
+
+            6. Finish with a short summary: the assigned area, the area you filed under (and why
+               you moved on, if different), and the issue number and title. If you filed nothing,
+               list what you checked.
