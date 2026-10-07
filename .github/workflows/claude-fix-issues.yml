@@ -1,0 +1,212 @@
+name: Claude fix agent
+
+on:
+  schedule:
+    # Every 2 hours: 00:00 02:00 ... 22:00 UTC = 05:30 07:30 ... 03:30 IST.
+    - cron: "0 */2 * * *"
+  workflow_dispatch: # lets you trigger a run by hand from the Actions tab
+    inputs:
+      issue:
+        description: "Issue number to fix (leave empty to pick the oldest eligible one)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-fix-issues
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    # macOS, so Claude can build and test the KortexKit package with Swift.
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # Personal access token for vijay-kartik/Kortex-Finance, stored as the GH_PAT repository secret.
+      # Falls back to the built-in workflow token when the secret is not set.
+      GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+          fetch-depth: 50
+
+      - name: Pick an issue that has no fix PR yet
+        id: pick
+        env:
+          ISSUE_OVERRIDE: ${{ inputs.issue }}
+        run: |
+          for l in "claude-fix|0e8a16|Pull request opened by the Claude fix agent" \
+                   "needs-human|d93f0b|The Claude fix agent needs a decision or more detail before it can fix this" \
+                   "auto-fix-failed|b60205|The Claude fix agent tried and failed; remove to let it retry" \
+                   "no-auto-fix|ededed|Keep the Claude fix agent away from this issue" \
+                   "claude-staged|5319e7|Moved forward step by step by the Claude comment agent" \
+                   "needs-design|fbca04|Waiting for Figma frames from the design brief to be made and approved"; do
+            IFS='|' read -r name color desc <<<"$l"
+            gh label create "$name" --color "$color" --description "$desc" --force
+          done
+
+          if [ -n "$ISSUE_OVERRIDE" ]; then
+            candidates=$ISSUE_OVERRIDE
+          else
+            # Open issues, oldest first, skipping any that already have a linked PR (open or
+            # closed), an assignee (someone is on it) or one of the opt-out labels. Issues the
+            # comment agent is moving forward (claude-staged, needs-design) are left to it.
+            candidates=$(gh api graphql -f owner="$GITHUB_REPOSITORY_OWNER" -f name="${GITHUB_REPOSITORY#*/}" -f query='
+              query($owner: String!, $name: String!) {
+                repository(owner: $owner, name: $name) {
+                  issues(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: ASC}) {
+                    nodes {
+                      number
+                      assignees { totalCount }
+                      labels(first: 30) { nodes { name } }
+                      closedByPullRequestsReferences(first: 1, includeClosedPrs: true) { totalCount }
+                    }
+                  }
+                }
+              }' --jq '.data.repository.issues.nodes[]
+                | select(.closedByPullRequestsReferences.totalCount == 0)
+                | select(.assignees.totalCount == 0)
+                | select(any(.labels.nodes[]; .name == "needs-human" or .name == "auto-fix-failed" or .name == "no-auto-fix" or .name == "claude-staged" or .name == "needs-design") | not)
+                | .number')
+          fi
+
+          issue=""
+          for n in $candidates; do
+            # A leftover branch means an earlier run got part-way; leave it for a human.
+            if git ls-remote --exit-code --heads origin "claude/issue-$n" >/dev/null; then continue; fi
+            issue=$n
+            break
+          done
+          if [ -z "$issue" ]; then
+            echo "No open issue needs a fix PR right now."
+            exit 0
+          fi
+
+          echo "Fixing issue #$issue"
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "claude/issue-$issue"
+
+      - name: Check out the Android app for reference
+        if: steps.pick.outputs.issue != ''
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: vijay-kartik/Kortex
+          token: ${{ secrets.GH_PAT || github.token }}
+          path: .android
+          fetch-depth: 1
+
+      - name: Select the newest Xcode
+        if: steps.pick.outputs.issue != ''
+        run: |
+          # Keeps the reference checkout out of Claude's commits.
+          echo ".android/" >> .git/info/exclude
+          xcode=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          swift --version
+
+      - name: Cache Swift packages
+        if: steps.pick.outputs.issue != ''
+        uses: actions/cache@v4
+        with:
+          path: Packages/KortexKit/.build
+          key: kortexkit-${{ runner.os }}-${{ hashFiles('Packages/KortexKit/Package.resolved') }}
+          restore-keys: kortexkit-${{ runner.os }}-
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.pick.outputs.issue != ''
+        with:
+          # Use ONE of these. The OAuth token bills your Claude Pro/Max plan
+          # (create it with `claude setup-token`); the API key bills the Anthropic API.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT || github.token }}
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 120
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git push -u origin claude/issue-${{ steps.pick.outputs.issue }}),Bash(swift build:*),Bash(swift test:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr create:*)"
+          prompt: |
+            You are fixing GitHub issue #${{ steps.pick.outputs.issue }} in Kortex for Mac
+            (${{ github.repository }}): a native SwiftUI macOS app (Swift 6, macOS 14+). `App/`
+            is a thin app target; everything else lives in the `Packages/KortexKit` Swift package.
+            The branch `claude/issue-${{ steps.pick.outputs.issue }}` is already checked out from
+            `main`. Do not switch branches.
+
+            The Android app (vijay-kartik/Kortex) shares the Firebase project, and its Firestore
+            document shapes are the contract this app follows. If `.android/` exists it is a
+            read-only checkout of that repository: use it to check field names and rules, never
+            edit it.
+
+            1. Read the issue and its comments:
+               `gh issue view ${{ steps.pick.outputs.issue }} --comments`
+               Then read `README.md` and the code involved. Match the conventions of the
+               surrounding code (naming, comment density, the package's target layering).
+
+            2. Decide whether this can be fixed well in one focused PR. If it cannot (too large,
+               ambiguous, needs a product or design decision, needs secrets or console access, or
+               the issue is not actually a problem), change no code. Instead, comment on the issue
+               explaining exactly what you need decided or clarified (number the decisions so the
+               owner can answer by number), add the `needs-human` label
+               (`gh issue edit ${{ steps.pick.outputs.issue }} --add-label needs-human`), and stop.
+               Large feature requests usually belong here; small, well-specified ones do not.
+               Every comment you post must end with the line `<!-- kortex-agent:fix -->`, so
+               the comment agent can tell it was not written by the owner.
+
+            3. Otherwise, implement the fix. Keep the change scoped to the issue: no unrelated
+               refactors or formatting changes. Add or update tests in
+               `Packages/KortexKit/Tests` when the logic involved is testable.
+
+            4. Verify it. In this CI environment you should build and test the package:
+               `swift build --package-path Packages/KortexKit` and
+               `swift test --package-path Packages/KortexKit` (add `--filter <TestTarget>` to
+               narrow it). The first build compiles Firebase and takes several minutes. The app
+               target (`App/`, XcodeGen, signing, `GoogleService-Info.plist`) can't be built here;
+               keep changes in the package where you can. If a failure is caused by your change,
+               fix it. If it is environmental, say so in the PR.
+
+            5. Commit only the files you changed, with the message
+               `<short summary> (#${{ steps.pick.outputs.issue }})`, then push:
+               `git push -u origin claude/issue-${{ steps.pick.outputs.issue }}`
+
+            6. Open the pull request:
+               `gh pr create --base main --head claude/issue-${{ steps.pick.outputs.issue }} --label claude-fix --title "<concise title>" --body-file <file>`
+               Write the body to a temp file first. Body format:
+
+               Fixes #${{ steps.pick.outputs.issue }}
+
+               ## Summary
+               What was wrong and how this fixes it, in 2–4 sentences.
+
+               ## Changes
+               Each changed file with one line on what changed.
+
+               ## Verification
+               The exact `swift` commands you ran and their results, and anything you could not
+               verify (e.g. UI behaviour that needs the running app).
+
+               ## Notes for the reviewer
+               Risks, decisions you made that the reviewer should check, and follow-ups.
+
+            7. Finish with the PR URL, or with why you stopped without one.
+
+      - name: Flag the issue if no PR came out of this run
+        if: always() && steps.pick.outputs.issue != ''
+        env:
+          ISSUE: ${{ steps.pick.outputs.issue }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          prs=$(gh pr list --head "claude/issue-$ISSUE" --state all --json number --jq length)
+          needs_human=$(gh issue view "$ISSUE" --json labels --jq 'any(.labels[]; .name == "needs-human")')
+          if [ "$prs" = "0" ] && [ "$needs_human" != "true" ]; then
+            gh issue edit "$ISSUE" --add-label auto-fix-failed
+            marker=$'\n\n<!-- kortex-agent:fix -->' # tells the comment agent a workflow wrote this
+            gh issue comment "$ISSUE" --body "The Claude fix agent couldn't open a PR for this issue ([run log]($RUN_URL)). To let it try again, remove the \`auto-fix-failed\` label and delete the \`claude/issue-$ISSUE\` branch if it exists.$marker"
+          fi
