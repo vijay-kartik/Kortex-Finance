@@ -47,7 +47,7 @@ public enum ReceiptParser {
             return Priced(line: line, label: line[..<m.range.lowerBound].trimmingCharacters(in: .whitespaces), amountMinor: minor)
         }
 
-        let total = priced.last { total.contains(in: $0.label) && !subtotal.contains(in: $0.label) }
+        let total = priced.last { self.total.contains(in: $0.label) && !subtotal.contains(in: $0.label) }
         let sub = priced.last { subtotal.contains(in: $0.label) }
         let taxSum = priced.filter { tax.contains(in: $0.label) && !self.total.contains(in: $0.label) }.reduce(Int64(0)) { $0 + $1.amountMinor }
         let taxMinor = taxSum > 0 ? taxSum : nil

@@ -81,7 +81,7 @@ struct AccountCard: View {
 
     var body: some View {
         let today = LocalDay.today()
-        let series = Balances.dailySeries(of: account, transactions: Array(data.transactions.values), accounts: data.accounts,
+        let series = Balances.dailySeries(of: account, transactions: data.ledgerEntries(of: account), accounts: data.accounts,
                                           from: today.adding(days: -29), to: today)
         let trendUp = (series.last?.minor ?? 0) >= (series.first?.minor ?? 0)
         VStack(alignment: .leading, spacing: 12) {
@@ -121,15 +121,14 @@ struct AccountDetail: View {
 
     var body: some View {
         let today = LocalDay.today()
-        let txs = Array(data.transactions.values)
+        let entries = data.ledgerEntries(of: account)
         let month = today.yearMonth
-        let flow = Balances.flow(of: account, transactions: txs, accounts: data.accounts, from: month.firstDay, to: today)
-        let lastFlow = Balances.flow(of: account, transactions: txs, accounts: data.accounts,
+        let flow = Balances.flow(of: account, transactions: entries, accounts: data.accounts, from: month.firstDay, to: today)
+        let lastFlow = Balances.flow(of: account, transactions: entries, accounts: data.accounts,
                                      from: month.adding(months: -1).firstDay, to: month.adding(months: -1).lastDay)
-        let series = Balances.dailySeries(of: account, transactions: txs, accounts: data.accounts, from: today.adding(days: -(range - 1)), to: today)
+        let series = Balances.dailySeries(of: account, transactions: entries, accounts: data.accounts, from: today.adding(days: -(range - 1)), to: today)
         let balance = data.balanceMinor(of: account)
         let change = balance - (series.first?.minor ?? balance)
-        let entries = txs.filter { Balances.touches($0, account, accounts: data.accounts) }
         let monthName = Format.monthName(month).uppercased()
 
         VStack(alignment: .leading, spacing: 16) {
@@ -306,10 +305,7 @@ enum AccountText {
     }
 
     static func lastActivity(_ a: Account, _ data: FinanceData) -> String {
-        let latest = data.transactions.values
-            .filter { $0.type != .opening && Balances.touches($0, a, accounts: data.accounts) }
-            .max { $0.occurredOn < $1.occurredOn }
-        guard let day = latest?.occurredOn else { return "No entries yet" }
+        guard let day = data.lastEntryOn(of: a) else { return "No entries yet" }
         let today = LocalDay.today()
         if day == today { return "Last entry today" }
         if day == today.adding(days: -1) { return "Last entry yesterday" }

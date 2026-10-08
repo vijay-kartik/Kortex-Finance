@@ -30,21 +30,23 @@ struct SidebarView: View {
                 Text("PLAN").sectionLabelStyle()
             }
             let data = finance.data
-            if !data.moneyAccounts.isEmpty {
+            let moneyAccounts = data.moneyAccounts
+            let cards = data.cards
+            if !moneyAccounts.isEmpty {
                 Section {
-                    ForEach(data.moneyAccounts) { ledgerRow($0, data: data) }
+                    ForEach(moneyAccounts) { ledgerRow($0, data: data) }
                 } header: {
                     Text("ACCOUNTS").sectionLabelStyle()
                 }
             }
-            if !data.cards.isEmpty {
+            if !cards.isEmpty {
                 Section {
-                    ForEach(data.cards) { ledgerRow($0, data: data) }
+                    ForEach(cards) { ledgerRow($0, data: data) }
                 } header: {
                     HStack {
                         Text("CARDS").sectionLabelStyle()
                         Spacer(minLength: 4)
-                        if data.cards.contains(where: { $0.kind == .creditCard }) {
+                        if cards.contains(where: { $0.kind == .creditCard }) {
                             Text(sidebarAmount(data.cardsOutstandingMinor))
                                 .font(.mono(11))
                                 .foregroundStyle(Color.kMuted.opacity(0.8))

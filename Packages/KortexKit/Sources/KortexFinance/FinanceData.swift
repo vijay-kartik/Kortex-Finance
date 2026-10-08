@@ -1,17 +1,26 @@
 /// Everything synced for the signed-in user, keyed by uid. Deleted records are dropped as their
 /// delete markers arrive; built-in categories are always present since they're never synced.
 public struct FinanceData: Sendable {
-    public var accounts: [String: Account] = [:]
-    public var transactions: [String: Transaction] = [:]
+    public private(set) var accounts: [String: Account] = [:]
+    public private(set) var transactions: [String: Transaction] = [:]
     public var categories: [String: Category] = Dictionary(uniqueKeysWithValues: BuiltInCategories.all.map { ($0.uid, $0) })
     public var recurring: [String: Recurring] = [:]
     public var statements: [String: CardStatement] = [:]
     public var merchants: [String: Merchant] = [:]
+    /// Rebuilt whenever accounts or transactions change: a debit card's link moves its spends between ledgers.
+    public private(set) var ledgers = LedgerIndex()
 
     public init() {}
 
-    public mutating func apply(_ rows: [RemoteRow<Account>]) { Self.merge(rows, into: &accounts) }
-    public mutating func apply(_ rows: [RemoteRow<Transaction>]) { Self.merge(rows, into: &transactions) }
+    public mutating func apply(_ rows: [RemoteRow<Account>]) {
+        Self.merge(rows, into: &accounts)
+        ledgers = LedgerIndex(transactions: transactions.values, accounts: accounts)
+    }
+
+    public mutating func apply(_ rows: [RemoteRow<Transaction>]) {
+        Self.merge(rows, into: &transactions)
+        ledgers = LedgerIndex(transactions: transactions.values, accounts: accounts)
+    }
     public mutating func apply(_ rows: [RemoteRow<Recurring>]) { Self.merge(rows, into: &recurring) }
     public mutating func apply(_ rows: [RemoteRow<CardStatement>]) { Self.merge(rows, into: &statements) }
     public mutating func apply(_ rows: [RemoteRow<Merchant>]) { Self.merge(rows, into: &merchants) }
@@ -41,15 +50,30 @@ public struct FinanceData: Sendable {
     /// What's owed on all your credit cards that aren't archived. Debit cards owe nothing: their
     /// balance is their bank account's.
     public var cardsOutstandingMinor: Int64 {
-        cards.filter { $0.kind == .creditCard }.reduce(0) { $0 + balanceMinor(of: $1) }
+        accounts.values.filter { $0.kind == .creditCard && !$0.archived }.reduce(0) { $0 + balanceMinor(of: $1) }
     }
 
+    /// Bank, cash and wallets that aren't archived, as `Balances.totalBalance`.
     public var totalBalanceMinor: Int64 {
-        Balances.totalBalance(accounts: accounts, transactions: Array(transactions.values))
+        accounts.values.filter { $0.kind.countsInTotal && !$0.archived }.reduce(0) { $0 + balanceMinor(of: $1) }
     }
 
+    /// As `Balances.balance`, looked up in `ledgers`. An account that isn't synced (yet) is summed
+    /// from its ledger's entries alone.
     public func balanceMinor(of account: Account) -> Int64 {
-        Balances.balance(of: account, transactions: transactions.values, accounts: accounts)
+        let ledgerAccount = accounts[Balances.ledger(of: account.uid, in: accounts)] ?? account
+        return ledgers.balanceMinor(on: ledgerAccount.uid)
+            ?? Balances.balance(of: account, transactions: ledgers.entries(on: ledgerAccount.uid), accounts: accounts)
+    }
+
+    /// The transactions on the account's ledger, either side: what `Balances.touches` picks out.
+    public func ledgerEntries(of account: Account) -> [Transaction] {
+        ledgers.entries(on: Balances.ledger(of: account.uid, in: accounts))
+    }
+
+    /// The day of the latest entry on the account's ledger, opening entries aside.
+    public func lastEntryOn(of account: Account) -> LocalDay? {
+        ledgers.lastEntryOn(Balances.ledger(of: account.uid, in: accounts))
     }
 
     /// Newest first, by day and then by time.

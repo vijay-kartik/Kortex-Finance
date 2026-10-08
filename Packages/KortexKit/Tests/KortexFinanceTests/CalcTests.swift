@@ -102,3 +102,65 @@ struct CalcTests {
         #expect(Pending.urgency(day(2026, 9, 28), today: today) == .overdue)
     }
 }
+
+struct LedgerIndexTests {
+    private func account(_ uid: String, _ kind: AccountKind, linked: String? = nil, archived: Bool = false) -> Account {
+        Account(uid: uid, kind: kind, name: uid, institution: nil, last4: nil, hasSecret: false, bankType: nil, ifsc: nil,
+                linkedAccountUid: linked, network: nil, expiry: nil, holder: nil, creditLimitMinor: nil, statementDay: nil,
+                dueDay: nil, colorToken: nil, archived: archived, createdAtMillis: 0, updatedAtMillis: 0)
+    }
+
+    private func move(_ uid: String, _ type: TransactionType, _ amount: Int64, from: String, to: String? = nil, on d: Int) -> Transaction {
+        var t = tx(uid, type, amount, on: day(2026, 9, d), account: from)
+        t.toAccountUid = to
+        return t
+    }
+
+    /// The same answers the full scans give, account by account.
+    private func expectMatchesScans(_ data: FinanceData, _ probes: [Account]) {
+        let all = Array(data.transactions.values)
+        for a in probes {
+            let touching = all.filter { Balances.touches($0, a, accounts: data.accounts) }
+            #expect(data.balanceMinor(of: a) == Balances.balance(of: a, transactions: all, accounts: data.accounts), "\(a.uid)")
+            #expect(Set(data.ledgerEntries(of: a).map(\.uid)) == Set(touching.map(\.uid)), "\(a.uid)")
+            #expect(data.lastEntryOn(of: a) == touching.filter { $0.type != .opening }.map(\.occurredOn).max(), "\(a.uid)")
+        }
+        #expect(data.totalBalanceMinor == Balances.totalBalance(accounts: data.accounts, transactions: all))
+        #expect(data.cardsOutstandingMinor == data.cards.filter { $0.kind == .creditCard }
+            .reduce(0) { $0 + Balances.balance(of: $1, transactions: all, accounts: data.accounts) })
+    }
+
+    @Test func indexedBalancesMatchTheScans() {
+        var data = FinanceData()
+        let accounts = [account("bank", .bank), account("wallet", .wallet), account("gold", .creditCard),
+                        account("debit", .debitCard, linked: "bank"), account("loose", .debitCard),
+                        account("old", .creditCard, archived: true)]
+        data.apply(accounts.map { RemoteRow.live($0) })
+        data.apply([
+            move("o", .opening, 100_000, from: "bank", on: 1),
+            move("i", .income, 50_000, from: "bank", on: 2),
+            move("d", .expense, 2_000, from: "debit", on: 3),               // lands on the linked bank
+            move("l", .expense, 700, from: "loose", on: 4),                 // an unlinked debit card is its own ledger
+            move("t", .transfer, 3_000, from: "bank", to: "wallet", on: 5),
+            move("td", .transfer, 1_000, from: "debit", to: "bank", on: 6), // both sides on one ledger
+            move("g", .expense, 4_250, from: "gold", on: 7),
+            move("p", .cardPayment, 4_000, from: "debit", to: "gold", on: 8),
+            move("r", .income, 999, from: "gold", on: 9),
+            move("x", .expense, 9_000, from: "old", on: 10),
+            move("u", .cardPayment, 500, from: FinanceIds.unknownAccount, to: "gold", on: 11),
+            move("gone", .expense, 5_000, from: "bank", on: 12),
+        ].map { RemoteRow.live($0) })
+        data.apply([RemoteRow<Transaction>.deleted(uid: "gone")])
+
+        #expect(data.balanceMinor(of: accounts[0]) == 141_000)
+        #expect(data.balanceMinor(of: accounts[3]) == 141_000, "a linked debit card shows its bank's balance")
+        #expect(data.balanceMinor(of: accounts[2]) == -250)
+        #expect(data.lastEntryOn(of: accounts[0]) == day(2026, 9, 8), "the deleted entry is gone")
+        expectMatchesScans(data, accounts + [account("unsynced", .wallet)])
+
+        // Linking the card later moves its spends onto the bank's ledger.
+        data.apply([RemoteRow.live(account("loose", .debitCard, linked: "bank"))])
+        #expect(data.balanceMinor(of: accounts[0]) == 140_300)
+        expectMatchesScans(data, accounts)
+    }
+}
