@@ -1,3 +1,4 @@
+import KortexFinance
 import SwiftUI
 
 /// Sidebar destinations. Overview maps 1:1 to the Android bottom bar; Plan holds the screens
@@ -43,6 +44,23 @@ public enum Destination: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .cards: "4"
         case .pending: "5"
         default: nil
+        }
+    }
+
+    /// The sidebar row's trailing count, as in Figma's Mac/Sidebar: what each screen lists. Pending
+    /// payments counts what the Pending screen shows and has none when nothing is due; Dashboard,
+    /// Expenses and Reports have none.
+    func count(in data: FinanceData, today: LocalDay) -> Int? {
+        switch self {
+        case .accounts: return data.moneyAccounts.count
+        case .cards: return data.cards.count
+        case .pending:
+            let due = Pending.summary(today: today, statements: Array(data.statements.values), recurring: Array(data.recurring.values),
+                                      transactions: Array(data.transactions.values)).count
+            return due > 0 ? due : nil
+        case .recurring: return data.recurring.count
+        case .categories: return data.categories.count
+        case .dashboard, .expenses, .reports: return nil
         }
     }
 
