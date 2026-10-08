@@ -228,16 +228,7 @@ struct ReportContent: View {
             if report.shares.isEmpty {
                 Text("No spending in this period.").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             } else {
-                GeometryReader { geo in
-                    let gaps = CGFloat(report.shares.count - 1) * 3
-                    HStack(spacing: 3) {
-                        ForEach(Array(report.shares.enumerated()), id: \.offset) { _, s in
-                            RoundedRectangle(cornerRadius: 3).fill(color(s))
-                                .frame(width: max(4, (geo.size.width - gaps) * CGFloat(s.percent) / 100))
-                        }
-                    }
-                }
-                .frame(height: 10)
+                ShareBar(shares: report.shares, height: 10)
                 HStack(spacing: 12) {
                     Text("CATEGORY").sectionLabelStyle().frame(maxWidth: .infinity, alignment: .leading)
                     Text("SHARE").sectionLabelStyle().frame(width: 56, alignment: .trailing)
@@ -252,7 +243,7 @@ struct ReportContent: View {
                         Hairline()
                         HStack(spacing: 12) {
                             HStack(spacing: 10) {
-                                Circle().fill(color(s)).frame(width: 8, height: 8)
+                                Circle().fill(Color.category(s.category)).frame(width: 8, height: 8)
                                 Text(s.category?.name ?? "Other").font(.grotesk(13)).foregroundStyle(Color.kInk)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -322,9 +313,5 @@ struct ReportContent: View {
             }
             .frame(height: 130, alignment: .bottom)
         }
-    }
-
-    private func color(_ s: CategoryShare) -> Color {
-        s.category.map { Color.token($0.colorToken) } ?? .kMuted
     }
 }

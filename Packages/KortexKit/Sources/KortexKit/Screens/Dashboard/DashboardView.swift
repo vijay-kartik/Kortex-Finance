@@ -189,7 +189,7 @@ struct PendingCard: View {
                 Text(Money.format(pending.totalMinor, wholeUnits: true)).font(.grotesk(28, .medium)).foregroundStyle(Color.kInk)
                 Text("due in the next 30 days").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             }
-            split(pending)
+            SplitBar(first: pending.cardBillsMinor, rest: pending.recurringMinor)
             if pending.items.isEmpty {
                 Text("Nothing due. Card bills and recurring payments show up here.")
                     .font(.grotesk(12)).foregroundStyle(Color.kMuted).padding(.vertical, 8)
@@ -210,18 +210,6 @@ struct PendingCard: View {
             .padding(.vertical, 10)
             .background(Color.kRaised, in: RoundedRectangle(cornerRadius: 10))
         }
-    }
-
-    private func split(_ p: PendingSummary) -> some View {
-        GeometryReader { geo in
-            let total = max(p.totalMinor, 1)
-            let cardWidth = p.totalMinor == 0 ? 0 : max(geo.size.width * CGFloat(p.cardBillsMinor) / CGFloat(total) - 1.5, p.cardBillsMinor > 0 ? 6 : 0)
-            HStack(spacing: 3) {
-                if p.cardBillsMinor > 0 { Capsule().fill(Color.kSynapse).frame(width: cardWidth) }
-                Capsule().fill(Color.kSynapse.opacity(p.recurringMinor > 0 ? 0.5 : 0.15))
-            }
-        }
-        .frame(height: 6)
     }
 
     private func row(_ item: PendingItem) -> some View {
@@ -335,20 +323,10 @@ struct WhereItWentCard: View {
             if shares.isEmpty {
                 Text("No spending yet this month.").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             } else {
-                GeometryReader { geo in
-                    let gaps = CGFloat(shares.count - 1) * 3
-                    HStack(spacing: 3) {
-                        ForEach(Array(shares.enumerated()), id: \.offset) { _, share in
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(color(share))
-                                .frame(width: max(4, (geo.size.width - gaps) * CGFloat(share.percent) / 100))
-                        }
-                    }
-                }
-                .frame(height: 8)
+                ShareBar(shares: shares, height: 8)
                 ForEach(Array(shares.enumerated()), id: \.offset) { _, share in
                     HStack(spacing: 10) {
-                        Circle().fill(color(share)).frame(width: 8, height: 8)
+                        Circle().fill(Color.category(share.category)).frame(width: 8, height: 8)
                         Text(share.category?.name ?? "Other").font(.grotesk(13)).foregroundStyle(Color.kInk)
                         Spacer()
                         Text("\(share.percent)%").font(.mono(12)).foregroundStyle(Color.kMuted)
@@ -358,10 +336,6 @@ struct WhereItWentCard: View {
                 }
             }
         }
-    }
-
-    private func color(_ share: CategoryShare) -> Color {
-        share.category.map { Color.token($0.colorToken) } ?? .kMuted
     }
 }
 
