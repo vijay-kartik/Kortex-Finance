@@ -61,6 +61,82 @@ struct Hairline: View {
     }
 }
 
+/// The two-part Synapse bar: a solid capsule for `first`, a half-strength one for `rest`
+/// (faint when `rest` is 0).
+struct SplitBar: View {
+    let first: Int64
+    let rest: Int64
+    var height: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(spacing: 3) {
+                if first > 0 { Capsule().fill(Color.kSynapse).frame(width: Self.firstWidth(first: first, rest: rest, in: geo.size.width)) }
+                Capsule().fill(Color.kSynapse.opacity(rest > 0 ? 0.5 : 0.15))
+            }
+        }
+        .frame(height: height)
+    }
+
+    /// `first`'s share of `width`, less half the 3pt gap, and at least 6pt; 0 when there's no `first`.
+    static func firstWidth(first: Int64, rest: Int64, in width: CGFloat) -> CGFloat {
+        guard first > 0 else { return 0 }
+        return max(6, width * CGFloat(first) / CGFloat(max(first + rest, 1)) - 1.5)
+    }
+}
+
+/// A legend row under a bar: dot, muted label, amount in whole units. `spread` pushes the amount
+/// to the trailing edge.
+struct LegendRow: View {
+    let color: Color
+    let label: String
+    let minor: Int64
+    var spread = false
+
+    init(_ color: Color, _ label: String, _ minor: Int64, spread: Bool = false) {
+        self.color = color
+        self.label = label
+        self.minor = minor
+        self.spread = spread
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label).font(.grotesk(13)).foregroundStyle(Color.kMuted)
+            if spread { Spacer() }
+            Text(Money.format(minor, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
+        }
+    }
+}
+
+/// Category shares as one stacked bar, each segment in its category's colour and at least 4pt wide.
+struct ShareBar: View {
+    let shares: [CategoryShare]
+    let height: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let gaps = CGFloat(shares.count - 1) * 3
+            HStack(spacing: 3) {
+                ForEach(Array(shares.enumerated()), id: \.offset) { _, share in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.category(share.category))
+                        .frame(width: max(4, (geo.size.width - gaps) * CGFloat(share.percent) / 100))
+                }
+            }
+        }
+        .frame(height: height)
+    }
+}
+
+extension Color {
+    /// A category's colour; Muted for no category.
+    static func category(_ category: SpendCategory?) -> Color {
+        category.map { Color.token($0.colorToken) } ?? .kMuted
+    }
+}
+
 enum Format {
     /// "September".
     static func monthName(_ month: YearMonth) -> String {

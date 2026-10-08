@@ -64,18 +64,9 @@ struct PendingView: View {
         KCard(spacing: 12) {
             Text("DUE IN NEXT 30 DAYS").sectionLabelStyle()
             Text(Money.format(s.totalMinor, wholeUnits: true)).font(.grotesk(32, .medium)).foregroundStyle(Color.kInk)
-            GeometryReader { geo in
-                let total = max(s.totalMinor, 1)
-                HStack(spacing: 3) {
-                    if s.cardBillsMinor > 0 {
-                        Capsule().fill(Color.kSynapse).frame(width: max(6, geo.size.width * CGFloat(s.cardBillsMinor) / CGFloat(total) - 1.5))
-                    }
-                    Capsule().fill(Color.kSynapse.opacity(s.recurringMinor > 0 ? 0.5 : 0.15))
-                }
-            }
-            .frame(height: 6)
-            legendRow(Color.kSynapse, "Card bills · \(s.cardBillCount)", s.cardBillsMinor)
-            legendRow(Color.kSynapse.opacity(0.5), "Subscriptions & fixed · \(s.recurringCount)", s.recurringMinor)
+            SplitBar(first: s.cardBillsMinor, rest: s.recurringMinor)
+            LegendRow(Color.kSynapse, "Card bills · \(s.cardBillCount)", s.cardBillsMinor, spread: true)
+            LegendRow(Color.kSynapse.opacity(0.5), "Subscriptions & fixed · \(s.recurringCount)", s.recurringMinor, spread: true)
             Hairline()
             HStack {
                 Text("Total balance").font(.grotesk(13)).foregroundStyle(Color.kMuted)
@@ -89,15 +80,6 @@ struct PendingView: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func legendRow(_ color: Color, _ label: String, _ minor: Int64) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(label).font(.grotesk(13)).foregroundStyle(Color.kMuted)
-            Spacer()
-            Text(Money.format(minor, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
-        }
     }
 
     // MARK: Calendar

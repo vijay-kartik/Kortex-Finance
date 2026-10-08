@@ -120,7 +120,7 @@ struct CategoryLabel: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(category.map { Color.token($0.colorToken) } ?? Color.kMuted).frame(width: 8, height: 8)
+            Circle().fill(Color.category(category)).frame(width: 8, height: 8)
             Text(category?.name ?? "Uncategorised").font(.grotesk(12)).foregroundStyle(category == nil ? Color.kMuted : Color.kInk)
         }
     }

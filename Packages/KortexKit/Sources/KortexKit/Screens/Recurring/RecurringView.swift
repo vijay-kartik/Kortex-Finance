@@ -113,19 +113,10 @@ struct RecurringView: View {
                     .layoutPriority(-1)
                 Spacer()
             }
-            GeometryReader { geo in
-                let total = max(t.perMonthMinor, 1)
-                HStack(spacing: 3) {
-                    if t.subscriptionsPerMonthMinor > 0 {
-                        Capsule().fill(Color.kSynapse).frame(width: max(6, geo.size.width * CGFloat(t.subscriptionsPerMonthMinor) / CGFloat(total) - 1.5))
-                    }
-                    Capsule().fill(Color.kSynapse.opacity(t.fixedPerMonthMinor > 0 ? 0.5 : 0.15))
-                }
-            }
-            .frame(height: 6)
+            SplitBar(first: t.subscriptionsPerMonthMinor, rest: t.fixedPerMonthMinor)
             HStack(spacing: 24) {
-                legend(.kSynapse, "Subscriptions · \(t.subscriptionCount)", t.subscriptionsPerMonthMinor)
-                legend(Color.kSynapse.opacity(0.5), "Fixed expenses · \(t.fixedCount)", t.fixedPerMonthMinor)
+                LegendRow(.kSynapse, "Subscriptions · \(t.subscriptionCount)", t.subscriptionsPerMonthMinor)
+                LegendRow(Color.kSynapse.opacity(0.5), "Fixed expenses · \(t.fixedCount)", t.fixedPerMonthMinor)
                 Spacer()
             }
         }
@@ -136,14 +127,6 @@ struct RecurringView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.grotesk(12)).foregroundStyle(Color.kMuted)
             Text(value).font(.mono(16)).foregroundStyle(Color.kInk).lineLimit(1).truncationMode(.middle).help(value)
-        }
-    }
-
-    private func legend(_ color: Color, _ label: String, _ minor: Int64) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(label).font(.grotesk(13)).foregroundStyle(Color.kMuted)
-            Text(Money.format(minor, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
         }
     }
 
