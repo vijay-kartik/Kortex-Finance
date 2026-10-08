@@ -139,7 +139,9 @@ public final class FinanceSync {
         }
         fromCache[collection] = snapshot.metadata.isFromCache
         if fromCache.count == Self.collections.count {
-            status = fromCache.values.contains(true) ? .offline : .live
+            // @Observable invalidates readers on every set, even of the same value.
+            let next: Status = fromCache.values.contains(true) ? .offline : .live
+            if status != next { status = next }
         }
     }
 

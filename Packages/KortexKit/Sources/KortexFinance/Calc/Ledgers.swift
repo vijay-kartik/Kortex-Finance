@@ -19,6 +19,42 @@ public struct LedgerFlow: Sendable {
     public var netMinor: Int64 { inMinor - outMinor }
 }
 
+/// Each ledger's transactions, balance and latest entry, grouped in one pass so the sidebar and
+/// Accounts look them up instead of scanning every transaction per account. Keyed by ledger uid
+/// (`Balances.ledger(of:in:)`), so a linked debit card's spends sit under its bank account.
+public struct LedgerIndex: Sendable {
+    private var entries: [String: [Transaction]] = [:]
+    /// Only for ledgers that are accounts: a balance's rules depend on the account's kind.
+    private var balances: [String: Int64] = [:]
+    private var lastEntryDays: [String: LocalDay] = [:]
+
+    public init() {}
+
+    public init(transactions: some Sequence<Transaction>, accounts: [String: Account]) {
+        for tx in transactions {
+            let from = Balances.ledger(of: tx.accountUid, in: accounts)
+            entries[from, default: []].append(tx)
+            if let to = tx.toAccountUid.map({ Balances.ledger(of: $0, in: accounts) }), to != from {
+                entries[to, default: []].append(tx)
+            }
+        }
+        for (uid, txs) in entries {
+            lastEntryDays[uid] = txs.lazy.filter { $0.type != .opening }.map(\.occurredOn).max()
+            guard let ledgerAccount = accounts[uid] else { continue }
+            balances[uid] = txs.reduce(0) { $0 + Balances.effect(of: $1, on: ledgerAccount, accounts: accounts) }
+        }
+    }
+
+    /// The transactions with either side on the ledger, as `Balances.touches` picks them.
+    public func entries(on ledgerUid: String) -> [Transaction] { entries[ledgerUid] ?? [] }
+
+    /// Nil when the ledger isn't an account or has no transactions.
+    public func balanceMinor(on ledgerUid: String) -> Int64? { balances[ledgerUid] }
+
+    /// The day of the ledger's latest entry, opening entries aside.
+    public func lastEntryOn(_ ledgerUid: String) -> LocalDay? { lastEntryDays[ledgerUid] }
+}
+
 public extension Balances {
     /// Whether `tx` touches `account`'s ledger, on either side.
     static func touches(_ tx: Transaction, _ account: Account, accounts: [String: Account]) -> Bool {
