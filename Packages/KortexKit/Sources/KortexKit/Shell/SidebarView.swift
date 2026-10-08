@@ -19,17 +19,18 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: Binding($selection)) {
+            let data = finance.data
+            let today = LocalDay.today()
             Section {
-                ForEach(Destination.overview) { row($0) }
+                ForEach(Destination.overview) { row($0, count: $0.count(in: data, today: today)) }
             } header: {
                 Text("OVERVIEW").sectionLabelStyle()
             }
             Section {
-                ForEach(Destination.plan) { row($0) }
+                ForEach(Destination.plan) { row($0, count: $0.count(in: data, today: today)) }
             } header: {
                 Text("PLAN").sectionLabelStyle()
             }
-            let data = finance.data
             let moneyAccounts = data.moneyAccounts
             let cards = data.cards
             if !moneyAccounts.isEmpty {
@@ -86,11 +87,21 @@ struct SidebarView: View {
         }
     }
 
-    private func row(_ destination: Destination) -> some View {
-        Label {
-            Text(destination.title).font(.grotesk(13, selection == destination ? .medium : .regular))
-        } icon: {
-            Image(systemName: destination.symbol)
+    /// The trailing count is Muted, or Amber for Pending payments.
+    private func row(_ destination: Destination, count: Int?) -> some View {
+        HStack(spacing: 8) {
+            Label {
+                Text(destination.title).font(.grotesk(13, selection == destination ? .medium : .regular))
+            } icon: {
+                Image(systemName: destination.symbol)
+            }
+            Spacer(minLength: 4)
+            if let count {
+                Text("\(count)")
+                    .font(.mono(11))
+                    .foregroundStyle(destination == .pending ? Color.kAmber : Color.kMuted)
+                    .lineLimit(1)
+            }
         }
         .tag(destination)
     }
