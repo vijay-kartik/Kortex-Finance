@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -6,7 +5,7 @@ import SwiftUI
 /// Expenses, an account, a card. Delete waits on `deleting`'s confirmation (`DeleteEntriesConfirmation`).
 @MainActor
 enum EntryActions {
-    static func perform(_ action: EntryAction, on uids: Set<String>, finance: FinanceSync, model: AppModel, deleting: Binding<[Entry]>) {
+    static func perform(_ action: EntryAction, on uids: Set<String>, finance: any FinanceStore, model: AppModel, deleting: Binding<[Entry]>) {
         switch action {
         case .edit(let uid):
             model.sheet = .editEntry(uid)
@@ -24,7 +23,7 @@ enum EntryActions {
 /// Asks before deleting the entries in `deleting`, once for all of them, and takes them out of the selection.
 struct DeleteEntriesConfirmation: ViewModifier {
     @Binding var deleting: [Entry]
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let model: AppModel
 
     func body(content: Content) -> some View {

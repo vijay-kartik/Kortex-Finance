@@ -1,11 +1,10 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Expenses (Figma: Mac · Expenses — monthly). Daily / Monthly / Yearly in the toolbar with ‹ › to
 /// step periods, the period's summary, then every entry in a table with the selected one in the inspector.
 struct ExpensesView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
     let go: (Destination) -> Void
 

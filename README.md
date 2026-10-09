@@ -47,6 +47,9 @@ learning), which produce a `Change`. `FinanceSync.apply` commits it as one Fires
 documents built field for field as Android writes them (`FinanceDocWriter`): every field written,
 `serverUpdatedAt` as a server timestamp, deletes as `deleted: true` markers.
 
+Screens and sheets only see the `KortexFinance.FinanceStore` protocol, which `FinanceSync` conforms to;
+`PreviewFinanceStore` keeps everything in memory, for `#Preview`s and tests without Firebase.
+
 ## Full account numbers
 
 The account sheet's Number field takes the full number or just the last 4, as on the phone. A full

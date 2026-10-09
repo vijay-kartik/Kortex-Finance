@@ -1,10 +1,9 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// New category and renaming / recolouring one of yours (Figma: Categories 02).
 struct CategorySheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let editing: SpendCategory?
     let close: () -> Void
 
@@ -15,7 +14,7 @@ struct CategorySheet: View {
 
     static let colors = ["Synapse", "Teal", "Amber", "Lilac", "Rose", "Mint", "Sky", "Growth"]
 
-    init(finance: FinanceSync, editing: SpendCategory?, kind: CategoryKind = .expense, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, editing: SpendCategory?, kind: CategoryKind = .expense, close: @escaping () -> Void) {
         self.finance = finance
         self.editing = editing
         self.close = close
@@ -74,7 +73,7 @@ struct CategorySheet: View {
 
 /// Delete category (Figma: Categories 03): its entries move to another category, or Uncategorised.
 struct DeleteCategorySheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let category: SpendCategory
     let close: () -> Void
 

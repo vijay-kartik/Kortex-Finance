@@ -1,11 +1,10 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Shows whichever sheet the window asked for.
 struct SheetHost: View {
     let sheet: Sheet
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let model: AppModel
     let close: () -> Void
 

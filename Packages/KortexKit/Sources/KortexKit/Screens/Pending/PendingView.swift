@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -6,7 +5,7 @@ import SwiftUI
 /// calendar of due days; the payments themselves, soonest first, on the right. Hovering a row shows
 /// Skip and Mark paid (Pay bill… for a card); right-click has the rest.
 struct PendingView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let model: AppModel
     let go: (Destination) -> Void
 
@@ -244,7 +243,7 @@ struct PendingView: View {
 /// A pending row's actions: Skip / Mark paid (or Pay bill…) on hover, everything on right-click.
 struct PendingActions: ViewModifier {
     let item: PendingItem
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let model: AppModel
     let go: (Destination) -> Void
     @State private var hovering = false

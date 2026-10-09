@@ -36,6 +36,40 @@ public struct FinanceData: Sendable {
         }, into: &categories)
     }
 
+    /// A change as its documents would come back through the listeners, without the round trip.
+    /// Secrets aren't part of the data and are skipped.
+    public mutating func apply(_ change: Change) {
+        var accounts: [RemoteRow<Account>] = [], transactions: [RemoteRow<Transaction>] = [], categories: [RemoteRow<Category>] = []
+        var recurring: [RemoteRow<Recurring>] = [], statements: [RemoteRow<CardStatement>] = [], merchants: [RemoteRow<Merchant>] = []
+        for write in change.writes {
+            switch write {
+            case .account(let a): accounts.append(.live(a))
+            case .transaction(let t): transactions.append(.live(t))
+            case .category(let c): categories.append(.live(c))
+            case .recurring(let r): recurring.append(.live(r))
+            case .statement(let s): statements.append(.live(s))
+            case .merchant(let m): merchants.append(.live(m))
+            case .secret: break
+            case .delete(let collection, let uid, _):
+                switch collection {
+                case .accounts: accounts.append(.deleted(uid: uid))
+                case .transactions: transactions.append(.deleted(uid: uid))
+                case .categories: categories.append(.deleted(uid: uid))
+                case .recurring: recurring.append(.deleted(uid: uid))
+                case .statements: statements.append(.deleted(uid: uid))
+                case .merchants: merchants.append(.deleted(uid: uid))
+                case .secrets: break
+                }
+            }
+        }
+        if !categories.isEmpty { apply(categories) }
+        if !accounts.isEmpty { apply(accounts) }
+        if !statements.isEmpty { apply(statements) }
+        if !recurring.isEmpty { apply(recurring) }
+        if !merchants.isEmpty { apply(merchants) }
+        if !transactions.isEmpty { apply(transactions) }
+    }
+
     // MARK: Derived
 
     /// Accounts that aren't cards, newest last like the phone's list.

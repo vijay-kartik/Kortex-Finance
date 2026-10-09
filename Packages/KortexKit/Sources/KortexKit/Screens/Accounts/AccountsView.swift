@@ -1,12 +1,11 @@
 import Charts
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Accounts (Figma: Mac · Accounts). The account cards on the left, the selected one's balance trend,
 /// this month's in and out, and its entries on the right. Cards live on their own screen.
 struct AccountsView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
     @State private var deleting: Account?
     /// Entries waiting on Delete's confirmation.
@@ -316,7 +315,7 @@ enum AccountText {
 /// Delete account (Figma: Delete account): its entries stay in history.
 struct DeleteAccountConfirmation: ViewModifier {
     @Binding var deleting: Account?
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let onDeleted: () -> Void
 
     func body(content: Content) -> some View {

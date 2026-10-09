@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -7,7 +6,7 @@ import SwiftUI
 /// matches (the receipt joins it rather than counting twice), and the review. The image stays on
 /// this Mac; the entry carries its path, as on the phone.
 struct ReceiptSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let file: URL
     let close: () -> Void
     let enterManually: () -> Void

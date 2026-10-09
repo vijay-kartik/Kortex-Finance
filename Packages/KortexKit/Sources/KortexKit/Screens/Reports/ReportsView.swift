@@ -1,5 +1,4 @@
 import AppKit
-import KortexCloud
 import KortexFinance
 import SwiftUI
 import UniformTypeIdentifiers
@@ -8,7 +7,7 @@ import UniformTypeIdentifiers
 /// rate, where it went against the period before, the largest entries and spend over time.
 /// Export PDF… saves the same layout through the Save panel.
 struct ReportsView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
 
     var body: some View {

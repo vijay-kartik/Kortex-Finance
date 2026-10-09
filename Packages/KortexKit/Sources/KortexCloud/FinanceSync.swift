@@ -9,17 +9,8 @@ import Observation
 /// finSecrets isn't listened to: a full number is read only when asked for (`revealNumber`).
 @MainActor
 @Observable
-public final class FinanceSync {
-    public enum Status: Equatable {
-        case idle
-        /// Waiting for the first answer from every collection.
-        case loading
-        /// Everything is current with the server.
-        case live
-        /// Showing Firestore's cached copy; the server can't be reached.
-        case offline
-        case failed(String)
-    }
+public final class FinanceSync: FinanceStore {
+    public typealias Status = FinanceStatus
 
     public private(set) var data = FinanceData()
     public private(set) var status: Status = .idle

@@ -6,7 +6,7 @@ import SwiftUI
 /// cards with their balances, and the signed-in account at the bottom.
 struct SidebarView: View {
     @Binding var selection: Destination
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let user: CloudUser
     let open: (Account) -> Void
     let signOut: () -> Void
@@ -232,7 +232,7 @@ struct SidebarView: View {
 }
 
 struct SyncStatusLine: View {
-    let status: FinanceSync.Status
+    let status: FinanceStatus
 
     var body: some View {
         HStack(spacing: 6) {

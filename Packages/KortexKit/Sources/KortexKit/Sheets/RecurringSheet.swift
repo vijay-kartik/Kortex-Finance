@@ -1,10 +1,9 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Add recurring payment and editing one (Figma: Recurring 02). Nothing is paid by saving.
 struct RecurringSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let editing: Recurring?
     let close: () -> Void
 
@@ -13,7 +12,7 @@ struct RecurringSheet: View {
     @State private var dueDate: Date
     @State private var error: String?
 
-    init(finance: FinanceSync, editing: Recurring?, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, editing: Recurring?, close: @escaping () -> Void) {
         self.finance = finance
         self.editing = editing
         self.close = close

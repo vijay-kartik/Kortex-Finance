@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -9,7 +8,7 @@ import SwiftUI
 /// A card bill payment is edited here too (where it came from, the card, the bill it pays), and money
 /// out and a card payment can each be made the other.
 struct EntrySheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let editing: Entry?
     let close: () -> Void
 
@@ -33,7 +32,7 @@ struct EntrySheet: View {
         let others: [Entry]
     }
 
-    init(finance: FinanceSync, type: TransactionType = .expense, editing: Entry? = nil, asTransfer: Bool = false, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, type: TransactionType = .expense, editing: Entry? = nil, asTransfer: Bool = false, close: @escaping () -> Void) {
         self.finance = finance
         self.editing = editing
         self.close = close
