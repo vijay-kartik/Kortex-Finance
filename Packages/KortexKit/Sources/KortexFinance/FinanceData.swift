@@ -37,7 +37,7 @@ public struct FinanceData: Sendable {
     }
 
     /// A change as its documents would come back through the listeners, without the round trip.
-    /// Secrets aren't part of the data and are skipped.
+    /// Secrets and budgets aren't part of the data and are skipped.
     public mutating func apply(_ change: Change) {
         var accounts: [RemoteRow<Account>] = [], transactions: [RemoteRow<Transaction>] = [], categories: [RemoteRow<Category>] = []
         var recurring: [RemoteRow<Recurring>] = [], statements: [RemoteRow<CardStatement>] = [], merchants: [RemoteRow<Merchant>] = []
@@ -58,7 +58,7 @@ public struct FinanceData: Sendable {
                 case .recurring: recurring.append(.deleted(uid: uid))
                 case .statements: statements.append(.deleted(uid: uid))
                 case .merchants: merchants.append(.deleted(uid: uid))
-                case .secrets: break
+                case .secrets, .budgets: break
                 }
             }
         }

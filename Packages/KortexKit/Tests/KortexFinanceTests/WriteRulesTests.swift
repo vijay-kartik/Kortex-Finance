@@ -372,9 +372,13 @@ struct WriteRulesTests {
                                                                 in: data, clock: clock)).first else { Issue.record("no entry"); return }
         data.apply([RemoteRow.live(tx)])
         let change = writes(CategoryRules.delete("c1", moveTo: "food", in: data, clock: clock))
-        #expect(change.count == 2)
+        #expect(change.count == 3)
         if case .transaction(let moved) = change[0] { #expect(moved.categoryUid == "food") }
-        if case .delete(let col, let uid, _) = change[1] { #expect(col == .categories && uid == "c1") }
+        let deleted = change.compactMap { write -> String? in
+            guard case .delete(let collection, let uid, let at) = write, at == clock.nowMillis else { return nil }
+            return "\(collection.rawValue)/\(uid)"
+        }
+        #expect(deleted == ["finBudgets/c1", "finCategories/c1"], "its budget goes with it, as on the phone")
         #expect(CategoryRules.delete("food", moveTo: nil, in: data, clock: clock).failure == .builtIn)
         #expect(CategoryRules.add(name: " food ", kind: .expense, colorToken: "Mint", in: data, clock: clock).failure == .nameTaken)
     }
@@ -417,12 +421,14 @@ struct ResetRulesTests {
     @Test func marksEveryDocumentDeletedButBuiltInCategories() {
         let live: [(collection: FinCollection, uid: String)] = [
             (.accounts, "bank"), (.secrets, "bank"), (.transactions, "t1"), (.categories, "food"), (.categories, "pets"), (.merchants, "m1"),
+            (.budgets, "food"), (.budgets, "pets"),
         ]
         let deleted = ResetRules.eraseAll(live, clock: clock).writes.compactMap { write -> String? in
             guard case .delete(let collection, let uid, let at) = write, at == clock.nowMillis else { return nil }
             return "\(collection.rawValue)/\(uid)"
         }
-        #expect(deleted == ["finAccounts/bank", "finSecrets/bank", "finTransactions/t1", "finCategories/pets", "finMerchants/m1"])
+        #expect(deleted == ["finAccounts/bank", "finSecrets/bank", "finTransactions/t1", "finCategories/pets", "finMerchants/m1",
+                           "finBudgets/food", "finBudgets/pets"], "built-in categories stay, their budgets don't")
     }
 }
 

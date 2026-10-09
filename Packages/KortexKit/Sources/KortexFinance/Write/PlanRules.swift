@@ -182,7 +182,9 @@ public enum CategoryRules {
     }
 
     /// Deleting never deletes entries: they, recurring payments and remembered merchants move to
-    /// `moveTo`, or to Uncategorised when it's nil.
+    /// `moveTo`, or to Uncategorised when it's nil. Its budget is deleted too, as the phone does: a
+    /// phone that pulls the category's marker deletes only the category. Budgets aren't read here, so
+    /// the marker is written either way; over a missing document it's only a tombstone.
     public static func delete(_ uid: String, moveTo: String?, in data: FinanceData, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
         guard let c = data.categories[uid] else { return .failure(.notFound) }
         guard !c.builtIn else { return .failure(.builtIn) }
@@ -204,6 +206,7 @@ public enum CategoryRules {
             m.updatedAtMillis = now
             writes.append(.merchant(m))
         }
+        writes.append(.delete(.budgets, uid: uid, atMillis: now))
         writes.append(.delete(.categories, uid: uid, atMillis: now))
         return .success(Change(writes))
     }
