@@ -1,11 +1,10 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Pay card bill (Figma: Recurring 04): full, minimum or any amount, from one of your accounts.
 /// It moves money between your accounts; the purchases were already counted as spending.
 struct PayBillSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let statementUid: String
     let close: () -> Void
 
@@ -17,7 +16,7 @@ struct PayBillSheet: View {
     @State private var date = Date()
     @State private var error: String?
 
-    init(finance: FinanceSync, statementUid: String, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, statementUid: String, close: @escaping () -> Void) {
         self.finance = finance
         self.statementUid = statementUid
         self.close = close
@@ -76,7 +75,7 @@ struct PayBillSheet: View {
 
 /// Mark as paid with a different amount, account or day (Figma: Recurring 03).
 struct MarkPaidSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let recurringUid: String
     let dueOn: LocalDay
     let close: () -> Void
@@ -86,7 +85,7 @@ struct MarkPaidSheet: View {
     @State private var date = Date()
     @State private var error: String?
 
-    init(finance: FinanceSync, recurringUid: String, dueOn: LocalDay, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, recurringUid: String, dueOn: LocalDay, close: @escaping () -> Void) {
         self.finance = finance
         self.recurringUid = recurringUid
         self.dueOn = dueOn

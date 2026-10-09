@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -6,7 +5,7 @@ import SwiftUI
 /// entries and spend; the selected one in the inspector with its trend and the merchants Kortex files
 /// under it. Built-in categories can't be changed; yours can be renamed, recoloured or deleted.
 struct CategoriesView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
 
     @State private var filter: Filter = .all

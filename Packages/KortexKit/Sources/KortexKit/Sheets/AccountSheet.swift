@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import LocalAuthentication
 import SwiftUI
@@ -7,7 +6,7 @@ import SwiftUI
 /// The number field takes the full number or just the last 4, as on the phone: a full number is
 /// sealed with the user's data key into finSecrets, and only shows after Touch ID or the password.
 struct AccountSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let editing: Account?
     let close: () -> Void
 
@@ -21,7 +20,7 @@ struct AccountSheet: View {
     @State private var revealed: String?
     @State private var revealing = false
 
-    init(finance: FinanceSync, editing: Account?, kind: AccountKind = .bank, close: @escaping () -> Void) {
+    init(finance: any FinanceStore, editing: Account?, kind: AccountKind = .bank, close: @escaping () -> Void) {
         self.finance = finance
         self.editing = editing
         self.close = close

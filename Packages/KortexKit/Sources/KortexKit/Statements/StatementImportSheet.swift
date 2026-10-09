@@ -1,5 +1,4 @@
 import KortexAI
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -7,7 +6,7 @@ import SwiftUI
 /// every row is checked against its printed balance. Into an account you have, rows already in Kortex
 /// are found and left out. Nothing is added until the review is saved.
 struct StatementImportSheet: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let file: URL
     /// The account the statement was imported from (its Import statement…), if any.
     let into: String?

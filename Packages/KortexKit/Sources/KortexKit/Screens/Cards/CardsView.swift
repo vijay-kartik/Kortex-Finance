@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -6,7 +5,7 @@ import SwiftUI
 /// statement history, then every entry on it. With more than one card, a picker in the toolbar
 /// switches between them.
 struct CardsView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
     @State private var deleting: Account?
     /// Entries waiting on Delete's confirmation.

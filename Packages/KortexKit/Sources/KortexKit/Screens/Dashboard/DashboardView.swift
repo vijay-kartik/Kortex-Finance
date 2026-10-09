@@ -1,12 +1,11 @@
 import Charts
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Dashboard (Figma: Kortex - Finances (Mac OS) › Mac · Dashboard). Four KPIs, cash flow beside
 /// pending payments, then pace, where it went and recent entries. Read-only until adding lands.
 struct DashboardView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     let appModel: AppModel
     let go: (Destination) -> Void
 
@@ -89,6 +88,11 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+#Preview {
+    DashboardView(finance: PreviewFinanceStore.sample(), appModel: AppModel(), go: { _ in })
+        .frame(width: 1200, height: 900)
 }
 
 struct KPITile: View {

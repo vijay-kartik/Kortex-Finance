@@ -1,11 +1,10 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
 /// Recurring payments (Figma: Mac · Recurring). What recurring costs each month, every subscription
 /// and fixed expense in a table, and the selected one in the inspector with its payment history.
 struct RecurringView: View {
-    let finance: FinanceSync
+    let finance: any FinanceStore
     @Bindable var model: AppModel
 
     @State private var filter: Filter = .all
