@@ -24,10 +24,11 @@ public final class FinanceSync {
     public private(set) var data = FinanceData()
     public private(set) var status: Status = .idle
 
-    @ObservationIgnored private var listeners: [ListenerRegistration] = []
+    @ObservationIgnored private var listeners: [String: ListenerRegistration] = [:]
+    /// Re-attaches waiting out their backoff, per collection.
+    @ObservationIgnored private var retries: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var userUid: String?
-    /// Per collection: nil before its first snapshot, else whether that snapshot came from the cache.
-    @ObservationIgnored private var fromCache: [String: Bool] = [:]
+    @ObservationIgnored private var health = SyncHealth(collections: FinanceSync.collections)
 
     private static let collections = ["finCategories", "finAccounts", "finStatements", "finRecurring", "finMerchants", "finTransactions"]
 
@@ -38,20 +39,39 @@ public final class FinanceSync {
         stop()
         userUid = uid
         status = .loading
-        let user = Firestore.firestore().collection("users").document(uid)
         for name in Self.collections {
-            let listener = user.collection(name).addSnapshotListener(includeMetadataChanges: true) { [weak self] snapshot, error in
-                // Firestore calls back on the main queue.
-                MainActor.assumeIsolated {
-                    guard let self, self.userUid == uid else { return }
-                    if let error {
-                        self.status = .failed(error.localizedDescription)
-                        return
-                    }
-                    if let snapshot { self.received(snapshot, collection: name) }
+            listen(to: name, uid: uid)
+        }
+    }
+
+    private func listen(to name: String, uid: String) {
+        let collection = Firestore.firestore().collection("users").document(uid).collection(name)
+        listeners[name] = collection.addSnapshotListener(includeMetadataChanges: true) { [weak self] snapshot, error in
+            // Firestore calls back on the main queue.
+            MainActor.assumeIsolated {
+                guard let self, self.userUid == uid else { return }
+                if let error {
+                    self.listenerFailed(name, uid: uid, error: error)
+                    return
                 }
+                if let snapshot { self.received(snapshot, collection: name) }
             }
-            listeners.append(listener)
+        }
+    }
+
+    /// Firestore ends a listener for good once it reports an error, so drop it and attach a new one
+    /// after a backoff. The collection counts as failed until the new one delivers a snapshot.
+    private func listenerFailed(_ name: String, uid: String, error: Error) {
+        listeners.removeValue(forKey: name)?.remove()
+        health.failed(name, message: error.localizedDescription)
+        updateStatus()
+        let delay = health.retryDelay(for: name)
+        retries[name]?.cancel()
+        retries[name] = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, !Task.isCancelled, self.userUid == uid else { return }
+            self.retries[name] = nil
+            self.listen(to: name, uid: uid)
         }
     }
 
@@ -124,10 +144,12 @@ public final class FinanceSync {
     }
 
     public func stop() {
-        listeners.forEach { $0.remove() }
-        listeners = []
+        retries.values.forEach { $0.cancel() }
+        retries = [:]
+        listeners.values.forEach { $0.remove() }
+        listeners = [:]
         userUid = nil
-        fromCache = [:]
+        health = SyncHealth(collections: Self.collections)
         data = FinanceData()
         status = .idle
     }
@@ -137,12 +159,14 @@ public final class FinanceSync {
         if !changes.isEmpty {
             apply(changes, collection: collection)
         }
-        fromCache[collection] = snapshot.metadata.isFromCache
-        if fromCache.count == Self.collections.count {
-            // @Observable invalidates readers on every set, even of the same value.
-            let next: Status = fromCache.values.contains(true) ? .offline : .live
-            if status != next { status = next }
-        }
+        health.received(collection, fromCache: snapshot.metadata.isFromCache)
+        updateStatus()
+    }
+
+    private func updateStatus() {
+        // @Observable invalidates readers on every set, even of the same value.
+        let next = health.status
+        if status != next { status = next }
     }
 
     private func apply(_ changes: [DocumentChange], collection: String) {
