@@ -75,6 +75,34 @@ struct CalcTests {
         #expect(shares.map(\.percent).reduce(0, +) == 100)
     }
 
+    @Test func standoutsOnlyLookAtThisMonthAndLast() {
+        var data = FinanceData()
+        data.apply([
+            tx("old", .expense, 900_000, on: day(2026, 7, 31), category: "food"),       // before last month
+            tx("last", .expense, 1_000, on: day(2026, 8, 3), category: "food"),
+            tx("late", .expense, 5_000, on: day(2026, 8, 20), category: "food"),        // after today's date last month
+            tx("food", .expense, 1_500, on: day(2026, 9, 2), category: "food"),
+            tx("trip", .expense, 500, on: day(2026, 9, 5), category: "travel", recurring: "r"),
+            tx("future", .expense, 800_000, on: day(2026, 10, 1), category: "travel"),  // after today
+        ].map { RemoteRow.live($0) })
+        let today = day(2026, 9, 10)
+        let text = { (s: Standout) in s.before + s.highlight + s.after }
+        let money = { (minor: Int64, _: Bool) in "\(minor)" }
+        let current = ExpensesInsights.standouts(data, month: today.yearMonth, to: today, today: today,
+                                                 money: money, monthName: { "M\($0.month)" }, dayName: { "D\($0.day)" })
+        #expect(current.map(text) == [
+            "Food was 75% of what you spent — 1500.",
+            "100% more than M8 by the same date.",
+            "Biggest single spend: Food, 1500 on D2.",
+            "1 recurring payment made for 500.",
+        ])
+        // A past month compares against the whole of the month before.
+        let august = YearMonth(year: 2026, month: 8)
+        let past = ExpensesInsights.standouts(data, month: august, to: august.lastDay, today: today,
+                                              money: money, monthName: { "M\($0.month)" }, dayName: { "D\($0.day)" })
+        #expect(past.map(text).dropFirst().first == "99% less than M7.")
+    }
+
     @Test func monthlyRecurringKeepsItsAnchorDay() {
         let rent = monthly("rent", anchor: 31, next: day(2026, 8, 31))
         #expect(RecurringSchedule.nextAfter(rent, day(2026, 8, 31)) == day(2026, 9, 30))

@@ -66,8 +66,13 @@ public enum ExpensesInsights {
     /// `to` is today for the current month, else the month's last day.
     public static func standouts(_ data: FinanceData, month: YearMonth, to: LocalDay, today: LocalDay,
                                  money: (Int64, Bool) -> String, monthName: (YearMonth) -> String, dayName: (LocalDay) -> String) -> [Standout] {
-        let txs = Array(data.transactions.values)
         let from = month.firstDay
+        let last = month.adding(months: -1)
+        // One pass over all of history down to the days compared below (this month, last month,
+        // last month to today's date); every sum after that runs over just those.
+        let windowFrom = min(last.firstDay, today.yearMonth.adding(months: -1).firstDay)
+        let windowTo = max(to, last.lastDay)
+        let txs = data.transactions.values.filter { $0.occurredOn.isWithin(windowFrom, windowTo) }
         let spent = Spending.spentMinor(txs, from: from, to: to)
         guard spent > 0 else { return [] }
         var out: [Standout] = []
@@ -75,7 +80,6 @@ public enum ExpensesInsights {
             out.append(Standout(before: "\(top.category!.name) was ", highlight: "\(top.percent)%",
                                 after: " of what you spent — \(money(top.amountMinor, true)).", tone: .neutral))
         }
-        let last = month.adding(months: -1)
         let lastSpent = to == today ? Spending.monthToDate(txs, today: today).lastMonthMinor : Spending.month(txs, last).spentMinor
         if lastSpent > 0 {
             let change = Int((Double(spent - lastSpent) * 100 / Double(lastSpent)).rounded())
