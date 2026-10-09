@@ -15,13 +15,14 @@ struct ExpensesView: View {
 
     enum Filter: String, CaseIterable { case all = "All", expenses = "Expenses", income = "Income" }
 
+    // Nothing here reads the table selection: that would re-run this whole body, summary and all, on
+    // every click and arrow key. Only ExpensesInspector reads it; the table gets it as a binding.
     var body: some View {
         let data = finance.data
         let today = LocalDay.today()
         let period = model.expensesPeriod
         let range = period.range
-        let txs = Array(data.transactions.values)
-        let inPeriod = txs.filter { $0.type != .opening && $0.occurredOn.isWithin(range.from, range.to) }
+        let inPeriod = data.transactions.values.filter { $0.type != .opening && $0.occurredOn.isWithin(range.from, range.to) }
         let shown = inPeriod.filter {
             switch filter {
             case .all: true
@@ -31,7 +32,7 @@ struct ExpensesView: View {
         }
 
         VStack(alignment: .leading, spacing: 16) {
-            summary(data: data, txs: txs, period: period, today: today)
+            ExpensesSummary(data: data, period: period, today: today, go: go)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
@@ -73,13 +74,7 @@ struct ExpensesView: View {
         .navigationSubtitle(inPeriod.count == 1 ? "1 entry" : "\(inPeriod.count) entries")
         .toolbar { toolbar(today: today) }
         .sidePanel(isPresented: showsInspector) {
-            let selected = model.selectedEntryUids.compactMap { data.transactions[$0] }
-            if selected.count > 1 {
-                SelectionSummary(entries: selected)
-            } else {
-                EntryInspector(entry: selected.first, data: data,
-                               onEdit: { model.sheet = .editEntry($0.uid) }, onDelete: { deleting = [$0] })
-            }
+            ExpensesInspector(model: model, data: data, onDelete: { deleting = [$0] })
         }
         .onDeleteCommand { perform(.delete, on: model.selectedEntryUids) }
         .modifier(DeleteEntriesConfirmation(deleting: $deleting, finance: finance, model: model))
@@ -133,10 +128,48 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: Summary
+    private func footer(_ shown: [Entry]) -> some View {
+        let out = shown.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
+        let inn = shown.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
+        return HStack(spacing: 16) {
+            Text(shown.count == 1 ? "1 entry" : "\(shown.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+            Spacer()
+            Text("Out \(Money.format(out))").font(.mono(12)).foregroundStyle(Color.kMuted)
+            Text("In \(Money.format(inn))").font(.mono(12)).foregroundStyle(Color.kGrowth)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
 
-    @ViewBuilder
-    private func summary(data: FinanceData, txs: [Entry], period: ExpensesPeriod, today: LocalDay) -> some View {
+/// The selected entry, or a summary of several. Its own view so that only it re-runs when the
+/// table selection changes.
+private struct ExpensesInspector: View {
+    let model: AppModel
+    let data: FinanceData
+    let onDelete: (Entry) -> Void
+
+    var body: some View {
+        let selected = model.selectedEntryUids.compactMap { data.transactions[$0] }
+        if selected.count > 1 {
+            SelectionSummary(entries: selected)
+        } else {
+            EntryInspector(entry: selected.first, data: data,
+                           onEdit: { model.sheet = .editEntry($0.uid) }, onDelete: onDelete)
+        }
+    }
+}
+
+/// The period's summary above the table: the day, month or year's totals, and in a month what stood out.
+/// Its own view so these passes over every entry run when the data or period changes, not the selection.
+private struct ExpensesSummary: View {
+    let data: FinanceData
+    let period: ExpensesPeriod
+    let today: LocalDay
+    let go: (Destination) -> Void
+
+    var body: some View {
+        let txs = Array(data.transactions.values)
         switch period.mode {
         case .daily: daily(txs: txs, day: period.day, today: today)
         case .monthly: monthly(data: data, txs: txs, month: period.month, today: today)
@@ -253,19 +286,6 @@ struct ExpensesView: View {
         return (Text(s.before) + Text(s.highlight).foregroundColor(color) + Text(s.after))
             .font(.grotesk(13))
             .foregroundColor(.kInk)
-    }
-
-    private func footer(_ shown: [Entry]) -> some View {
-        let out = shown.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        let inn = shown.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        return HStack(spacing: 16) {
-            Text(shown.count == 1 ? "1 entry" : "\(shown.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
-            Spacer()
-            Text("Out \(Money.format(out))").font(.mono(12)).foregroundStyle(Color.kMuted)
-            Text("In \(Money.format(inn))").font(.mono(12)).foregroundStyle(Color.kGrowth)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
