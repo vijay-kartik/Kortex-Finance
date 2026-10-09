@@ -118,8 +118,8 @@ public final class FinanceSync: FinanceStore {
         return number
     }
 
-    /// Reset data: marks every finance document deleted, finSecrets included (which isn't listened
-    /// to), so the phone erases them too on its next sync. Reads from the server when it can be reached.
+    /// Reset data: marks every finance document deleted, finSecrets and finBudgets included (which
+    /// aren't listened to), so the phone erases them too on its next sync. Reads from the server when it can be reached.
     public func eraseAll() async throws {
         guard let uid = userUid else { return }
         let user = Firestore.firestore().collection("users").document(uid)

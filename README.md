@@ -66,9 +66,11 @@ others, switch `Cloud.configure()` to `AppAttestProviderFactory` and add the App
 ## Reset data
 
 The account menu at the bottom of the sidebar has Reset Data…, which erases everything and keeps you
-signed in. `FinanceSync.eraseAll` reads every `fin*` collection (`finSecrets` included) and writes a
-`deleted: true` marker over each live document (`KortexFinance.ResetRules`), so the phone erases them
-on its next pull, which only sees changed documents and would miss a removal. Built-in categories stay.
+signed in. `FinanceSync.eraseAll` reads every `fin*` collection (`finSecrets` and `finBudgets` included) and
+writes a `deleted: true` marker over each live document (`KortexFinance.ResetRules`), so the phone
+erases them on its next pull, which only sees changed documents and would miss a removal. Built-in
+categories stay, but their budgets are erased. Deleting one of your categories deletes its budget too,
+as on the phone.
 Receipt images in Application Support/Receipts are removed too; settings and the AI key are kept.
 
 ## Deleted accounts

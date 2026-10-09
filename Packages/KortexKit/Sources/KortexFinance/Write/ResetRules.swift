@@ -2,7 +2,8 @@
 public enum ResetRules {
     /// Delete markers for every live finance document, rather than removing the documents: the phone
     /// pulls only what changed since its last sync, so it would never notice a removal (and would push
-    /// its copy back). Built-in categories are fixed on every device and never erased.
+    /// its copy back). Built-in categories are fixed on every device and never erased; their budgets
+    /// (`finBudgets`, under the same uids) are.
     public static func eraseAll(_ live: [(collection: FinCollection, uid: String)], clock: FinanceClock = .system) -> Change {
         let builtIn = Set(BuiltInCategories.all.map(\.uid))
         let now = clock.nowMillis

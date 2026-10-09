@@ -7,6 +7,9 @@ public enum FinCollection: String, Sendable, CaseIterable {
     case merchants = "finMerchants"
     case transactions = "finTransactions"
     case secrets = "finSecrets"
+    /// `finBudgets/{categoryUid}`, the phone's monthly budgets. Not read here; only erased with
+    /// their category, or by a reset.
+    case budgets = "finBudgets"
 }
 
 /// One document write: a record to save in full, or a delete marker.
