@@ -11,8 +11,21 @@ struct KCard<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+            .panelSurface()
+    }
+}
+
+extension View {
+    /// The Figma "Card" surface: Panel fill, Edge hairline, radius 16. `clipped` for edge-to-edge
+    /// tables and lists, so their rows don't paint over the rounded corners.
+    @ViewBuilder
+    func panelSurface(clipped: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 16)
+        if clipped {
+            background(Color.kPanel, in: shape).clipShape(shape).overlay(shape.strokeBorder(Color.kEdge))
+        } else {
+            background(Color.kPanel, in: shape).overlay(shape.strokeBorder(Color.kEdge))
+        }
     }
 }
 
@@ -26,6 +39,26 @@ struct CardHeader<Trailing: View>: View {
             Text(title).font(.grotesk(16, .medium)).foregroundStyle(Color.kInk)
             Spacer(minLength: 8)
             trailing
+        }
+    }
+}
+
+/// An edge-to-edge panel's title row: "Entries" on the left, a count or filter on the right,
+/// and a hairline under it.
+struct PanelHeader<Trailing: View>: View {
+    let title: String
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(title).font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
+                Spacer()
+                trailing
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            Hairline()
         }
     }
 }

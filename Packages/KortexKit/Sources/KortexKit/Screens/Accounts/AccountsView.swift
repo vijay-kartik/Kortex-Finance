@@ -183,19 +183,12 @@ struct AccountDetail: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
-                HStack {
-                    Text("Entries in this account").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
-                    Spacer()
+                PanelHeader(title: "Entries in this account") {
                     Text(entries.count == 1 ? "1 entry" : "\(entries.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                Hairline()
                 EntriesTable(entries: entries, data: data, selection: $selectedEntry, onAction: onEntryAction)
             }
-            .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+            .panelSurface(clipped: true)
             .frame(minHeight: 220)
         }
         .padding(24)
