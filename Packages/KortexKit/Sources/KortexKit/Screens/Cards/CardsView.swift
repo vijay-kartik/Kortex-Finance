@@ -98,14 +98,9 @@ struct CardDetail: View {
         // A table sizes to what it's given; in this scrolling page it's given a height for its rows.
         let height = min(max(CGFloat(list.count) * 28 + 34, 120), 520)
         return VStack(spacing: 0) {
-            HStack {
-                Text("Entries on this card").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
-                Spacer()
+            PanelHeader(title: "Entries on this card") {
                 Text(list.count == 1 ? "1 entry" : "\(list.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            Hairline()
             if list.isEmpty {
                 Text("Nothing on this card yet.").font(.grotesk(12)).foregroundStyle(Color.kMuted)
                     .frame(maxWidth: .infinity, minHeight: 80)
@@ -114,9 +109,7 @@ struct CardDetail: View {
                     .frame(height: height)
             }
         }
-        .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+        .panelSurface(clipped: true)
     }
 
     // MARK: Credit
