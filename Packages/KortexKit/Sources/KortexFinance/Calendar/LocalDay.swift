@@ -30,18 +30,32 @@ public struct LocalDay: Sendable, Hashable, Comparable, CustomStringConvertible 
         self.init(year: y, month: m, day: d)
     }
 
-    /// Today in the given zone (the Mac's own by default).
-    public static func today(in timeZone: TimeZone = .current) -> LocalDay {
+    /// The Gregorian calendar in the given zone. Days are Gregorian whatever calendar the Mac is set to,
+    /// so every `Date` conversion goes through this rather than `Calendar.current`.
+    public static func calendar(in timeZone: TimeZone = .current) -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let c = calendar.dateComponents([.year, .month, .day], from: Date())
-        return LocalDay(year: c.year!, month: c.month!, day: c.day!)!
+        return calendar
+    }
+
+    /// The day `date` falls on in the given zone (the Mac's own by default).
+    public init(date: Date, in timeZone: TimeZone = .current) {
+        let c = Self.calendar(in: timeZone).dateComponents([.year, .month, .day], from: date)
+        self.init(year: c.year!, month: c.month!, day: c.day!)!
+    }
+
+    /// Today in the given zone (the Mac's own by default).
+    public static func today(in timeZone: TimeZone = .current) -> LocalDay {
+        LocalDay(date: Date(), in: timeZone)
+    }
+
+    /// Midnight at the start of this day in the given zone.
+    public func date(in timeZone: TimeZone) -> Date {
+        Self.calendar(in: timeZone).date(from: DateComponents(year: year, month: month, day: day))!
     }
 
     /// Midnight at the start of this day in the Mac's zone, for formatting.
-    public var date: Date {
-        Calendar.current.date(from: DateComponents(year: year, month: month, day: day))!
-    }
+    public var date: Date { date(in: .current) }
 
     public var description: String {
         String(format: "%04d-%02d-%02d", year, month, day)
