@@ -191,8 +191,8 @@ struct ReceiptSheet: View {
                 Text("\(Money.format(existing.amountMinor)) at \(existing.merchant ?? "an expense") on \(EntryFormat.account(existing.accountUid, finance.data)), \(EntryFormat.when(existing)).")
                     .font(.grotesk(12)).foregroundStyle(Color.kInk)
                 HStack {
-                    Button("Attach receipt to that entry") { attach(to: existing) }.buttonStyle(.borderedProminent).tint(.kSynapse)
-                    Button("Add as a new entry") { duplicateDismissed = true }
+                    Button("Attach receipt to that entry") { attach(to: existing) }.buttonStyle(.kortexPrimary)
+                    Button("Add as a new entry") { duplicateDismissed = true }.buttonStyle(.kortexSecondary)
                 }
             }
             .padding(.vertical, 4)
@@ -211,12 +211,11 @@ struct ReceiptSheet: View {
     private func buttons(primary: (String, () -> Void)?) -> some View {
         HStack {
             Spacer()
-            Button("Cancel", action: close).keyboardShortcut(.cancelAction)
+            Button("Cancel", action: close).buttonStyle(.kortex(.secondary, hint: "esc")).keyboardShortcut(.cancelAction)
             if let primary {
-                Button(primary.0, action: primary.1).keyboardShortcut(.defaultAction).tint(.kSynapse)
+                Button(primary.0, action: primary.1).buttonStyle(.kortex(.primary, hint: "⏎")).keyboardShortcut(.defaultAction)
             }
         }
-        .controlSize(.large)
         .padding(.horizontal, 24)
         .padding(.bottom, 20)
     }

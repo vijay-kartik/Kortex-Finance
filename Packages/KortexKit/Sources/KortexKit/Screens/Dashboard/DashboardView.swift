@@ -83,7 +83,7 @@ struct DashboardView: View {
                 .foregroundStyle(Color.kMuted)
             if finance.status != .loading {
                 Button("Add account…") { appModel.sheet = .account(nil, .bank) }
-                    .buttonStyle(.borderedProminent).tint(.kSynapse).padding(.top, 6)
+                    .buttonStyle(.kortexPrimary).padding(.top, 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

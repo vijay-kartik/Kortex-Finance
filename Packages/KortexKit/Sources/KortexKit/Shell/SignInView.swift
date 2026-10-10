@@ -26,14 +26,9 @@ struct SignInView: View {
                             ProgressView().controlSize(.small).tint(Color.kVoid)
                         }
                         Text(session.state == .signingIn ? "Waiting for Google…" : "Continue with Google")
-                            .font(.grotesk(14, .medium))
                     }
-                    .foregroundStyle(Color.kVoid)
-                    .padding(.horizontal, 22)
-                    .frame(height: 38)
-                    .background(Color.kSynapse, in: RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.kortex(.primary, size: .large))
                 .disabled(session.state == .signingIn)
                 .keyboardShortcut(.defaultAction)
                 .padding(.top, 8)
