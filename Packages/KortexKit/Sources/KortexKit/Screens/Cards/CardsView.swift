@@ -184,10 +184,8 @@ struct CardDetail: View {
                     .font(.grotesk(12)).foregroundStyle(Color.kMuted)
             }
             if let statement, unpaid > 0, let onPayBill {
-                Button { onPayBill(statement.uid) } label: { Text("Pay bill…").padding(.horizontal, 10) }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(.kSynapse)
+                Button("Pay bill…") { onPayBill(statement.uid) }
+                    .buttonStyle(.kortexPrimary)
             }
         }
     }

@@ -87,7 +87,7 @@ struct StatementImportSheet: View {
             }
             Text("The pages go to \(model.rawValue) through Vercel AI Gateway. Kortex asks for only the last 4 digits of account and card numbers.")
                 .font(.grotesk(12)).foregroundStyle(Color.kMuted).multilineTextAlignment(.center).frame(maxWidth: 520)
-            Button("Cancel", action: close).keyboardShortcut(.cancelAction).padding(.top, 8)
+            Button("Cancel", action: close).buttonStyle(.kortex(.secondary, hint: "esc")).keyboardShortcut(.cancelAction).padding(.top, 8)
         }
     }
 
@@ -101,6 +101,7 @@ struct StatementImportSheet: View {
                 Button("Try again") { Task { await read() } }
                 Button("Close", action: close).keyboardShortcut(.cancelAction)
             }
+            .buttonStyle(.kortexSecondary)
             .padding(.top, 6)
         }
     }
@@ -140,7 +141,7 @@ struct StatementImportSheet: View {
                 .disabled(!supported || added.contains(a.id))
             }
             Spacer()
-            HStack { Spacer(); Button(added.isEmpty ? "Cancel" : "Done", action: close).keyboardShortcut(.cancelAction) }
+            HStack { Spacer(); Button(added.isEmpty ? "Cancel" : "Done", action: close).buttonStyle(.kortex(.secondary, hint: "esc")).keyboardShortcut(.cancelAction) }
         }
         .padding(24)
     }
@@ -424,16 +425,15 @@ struct StatementImportSheet: View {
             if let error { Label(error, systemImage: "exclamationmark.triangle").font(.grotesk(12)).foregroundStyle(Color.kAlarm).lineLimit(2) }
             Spacer()
             if let statement, statement.accounts.count > 1 {
-                Button("Back") { stage = .pickAccount(statement.accounts) }
+                Button("Back") { stage = .pickAccount(statement.accounts) }.buttonStyle(.kortexSecondary)
             }
-            Button("Cancel", action: close).keyboardShortcut(.cancelAction)
+            Button("Cancel", action: close).buttonStyle(.kortex(.secondary, hint: "esc")).keyboardShortcut(.cancelAction)
             Button(into.map { "Add \(entries) to \($0.name)" } ?? "Add account and \(entries)", action: save)
+                .buttonStyle(.kortex(.primary, hint: "⏎"))
                 .keyboardShortcut(.defaultAction)
-                .tint(.kSynapse)
                 // Nothing new and no bill to add: everything on the statement is already in Kortex.
                 .disabled(into != nil && n == 0 && (s.bill == nil || StatementImportRules.billExists(s, in: finance.data)))
         }
-        .controlSize(.large)
         .padding(16)
     }
 

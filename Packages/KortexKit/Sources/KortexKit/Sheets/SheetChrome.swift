@@ -33,12 +33,13 @@ struct SheetChrome<Content: View>: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.kortex(.secondary, hint: "esc"))
+                    .keyboardShortcut(.cancelAction)
                 Button(primary, role: destructive ? .destructive : nil, action: onPrimary)
+                    .buttonStyle(.kortex(destructive ? .destructive : .primary, hint: "⏎"))
                     .keyboardShortcut(.defaultAction)
-                    .tint(destructive ? .kAlarm : .kSynapse)
             }
-            .controlSize(.large)
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }

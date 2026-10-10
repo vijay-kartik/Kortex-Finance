@@ -54,6 +54,100 @@ struct CardLink: View {
     }
 }
 
+/// The Figma "Button": radius 8, Space Grotesk medium. Primary is Synapse with a Void label, secondary
+/// Panel with an Edge hairline and an Ink label, destructive Alarm with a Void label. `hint` is the
+/// shortcut drawn after the label ("⏎", "esc"); it doesn't bind the key, so keep `.keyboardShortcut`.
+/// Use it for actions in sheets and screens; toolbar items, header controls and menus stay native.
+struct KortexButtonStyle: ButtonStyle {
+    enum Role { case primary, secondary, destructive }
+
+    enum Size {
+        /// Sheet footers and screen actions: 32pt, 13pt label.
+        case regular
+        /// Row actions shown on hover: 26pt, 12pt label.
+        case small
+        /// The one call to action on an empty window (sign-in): 38pt, 14pt label.
+        case large
+
+        var height: CGFloat {
+            switch self {
+            case .regular: 32
+            case .small: 26
+            case .large: 38
+            }
+        }
+
+        var fontSize: CGFloat {
+            switch self {
+            case .regular: 13
+            case .small: 12
+            case .large: 14
+            }
+        }
+
+        var padding: CGFloat {
+            switch self {
+            case .regular: 14
+            case .small: 10
+            case .large: 22
+            }
+        }
+    }
+
+    var role: Role = .primary
+    var size: Size = .regular
+    var hint: String?
+
+    func makeBody(configuration: Configuration) -> some View {
+        Styled(configuration: configuration, style: self)
+    }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        let style: KortexButtonStyle
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8)
+            HStack(spacing: 6) {
+                configuration.label.font(.grotesk(style.size.fontSize, .medium))
+                if let hint = style.hint {
+                    Text(hint).font(.grotesk(11)).foregroundStyle(hintColor)
+                }
+            }
+            .foregroundStyle(labelColor)
+            .lineLimit(1)
+            .padding(.horizontal, style.size.padding)
+            .frame(height: style.size.height)
+            .background(fill, in: shape)
+            .overlay { if style.role == .secondary { shape.strokeBorder(Color.kEdge) } }
+            .contentShape(shape)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
+        }
+
+        private var fill: Color {
+            switch style.role {
+            case .primary: .kSynapse
+            case .secondary: .kPanel
+            case .destructive: .kAlarm
+            }
+        }
+
+        private var labelColor: Color { style.role == .secondary ? .kInk : .kVoid }
+
+        private var hintColor: Color { style.role == .secondary ? .kMuted : .kVoid }
+    }
+}
+
+extension ButtonStyle where Self == KortexButtonStyle {
+    static var kortexPrimary: KortexButtonStyle { KortexButtonStyle(role: .primary) }
+    static var kortexSecondary: KortexButtonStyle { KortexButtonStyle(role: .secondary) }
+
+    static func kortex(_ role: KortexButtonStyle.Role, size: KortexButtonStyle.Size = .regular, hint: String? = nil) -> KortexButtonStyle {
+        KortexButtonStyle(role: role, size: size, hint: hint)
+    }
+}
+
 /// A hairline between rows.
 struct Hairline: View {
     var body: some View {

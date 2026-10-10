@@ -256,15 +256,14 @@ struct PendingActions: ViewModifier {
                     HStack(spacing: 6) {
                         if item.kind == .cardBill {
                             Button("Pay bill…") { model.sheet = .payBill(statementUid: item.sourceUid) }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.kortex(.primary, size: .small))
                         } else {
                             Button("Skip") { skip() }
+                                .buttonStyle(.kortex(.secondary, size: .small))
                             Button { markPaid() } label: { Label("Mark paid", systemImage: "checkmark") }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.kortex(.primary, size: .small))
                         }
                     }
-                    .controlSize(.small)
-                    .tint(.kSynapse)
                     .padding(.trailing, 16)
                 }
             }
