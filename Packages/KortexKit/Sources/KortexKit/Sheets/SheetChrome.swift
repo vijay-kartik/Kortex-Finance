@@ -143,10 +143,3 @@ struct FlowLayout: Layout {
         }
     }
 }
-
-extension LocalDay {
-    init(date: Date) {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        self = LocalDay(year: c.year!, month: c.month!, day: c.day!)!
-    }
-}

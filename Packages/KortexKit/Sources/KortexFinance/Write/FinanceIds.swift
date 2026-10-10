@@ -64,19 +64,14 @@ public struct FinanceClock: Sendable {
     public var today: LocalDay { dayOf(nowMillis) }
 
     public func dayOf(_ millis: Int64) -> LocalDay {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = zone
-        let c = calendar.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: TimeInterval(millis) / 1000))
-        return LocalDay(year: c.year!, month: c.month!, day: c.day!)!
+        LocalDay(date: Date(timeIntervalSince1970: TimeInterval(millis) / 1000), in: zone)
     }
 
     /// When something picked as happening on `day` is saved: now for today, otherwise noon, so the
     /// day can't slip across zones.
     public func millisOn(_ day: LocalDay) -> Int64 {
         if day == today { return nowMillis }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = zone
-        let noon = calendar.date(from: DateComponents(year: day.year, month: day.month, day: day.day, hour: 12))!
+        let noon = LocalDay.calendar(in: zone).date(from: DateComponents(year: day.year, month: day.month, day: day.day, hour: 12))!
         return Int64(noon.timeIntervalSince1970 * 1000)
     }
 }
