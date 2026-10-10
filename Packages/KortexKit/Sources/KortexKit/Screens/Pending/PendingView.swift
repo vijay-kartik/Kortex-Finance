@@ -184,8 +184,7 @@ struct PendingView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+        .panelSurface()
     }
 
     @ViewBuilder

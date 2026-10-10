@@ -34,9 +34,7 @@ struct ExpensesView: View {
             summary(data: data, txs: txs, period: period, today: today)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
-                HStack(spacing: 10) {
-                    Text("Entries").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
-                    Spacer()
+                PanelHeader(title: "Entries") {
                     Picker("Show", selection: $filter) {
                         ForEach(Filter.allCases, id: \.self) { Text($0.rawValue) }
                     }
@@ -44,9 +42,6 @@ struct ExpensesView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                Hairline()
                 if shown.isEmpty {
                     Text(inPeriod.isEmpty ? "Nothing added in this period." : "No \(filter.rawValue.lowercased()) in this period.")
                         .font(.grotesk(13)).foregroundStyle(Color.kMuted)
@@ -59,9 +54,7 @@ struct ExpensesView: View {
                 Hairline()
                 footer(shown)
             }
-            .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+            .panelSurface(clipped: true)
             // An explicit minimum: the table's own one is large enough that, under the taller
             // monthly summary, the page outgrew the window and its top was cut off.
             .frame(minHeight: 160, maxHeight: .infinity)
@@ -221,8 +214,7 @@ struct ExpensesView: View {
                             .lineLimit(3)
                             .frame(maxWidth: .infinity, minHeight: 40, alignment: .topLeading)
                             .padding(14)
-                            .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.kEdge))
+                            .panelSurface()
                     }
                 }
             }
