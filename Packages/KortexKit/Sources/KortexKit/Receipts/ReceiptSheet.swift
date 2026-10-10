@@ -257,7 +257,7 @@ struct ReceiptSheet: View {
     private var occurredAt: Int64 {
         let clock = FinanceClock.system
         let day = LocalDay(date: date)
-        guard let time, let at = Calendar.current.date(from: DateComponents(year: day.year, month: day.month, day: day.day, hour: time.hour, minute: time.minute)) else {
+        guard let time, let at = LocalDay.calendar().date(from: DateComponents(year: day.year, month: day.month, day: day.day, hour: time.hour, minute: time.minute)) else {
             return clock.millisOn(day)
         }
         return Int64(at.timeIntervalSince1970 * 1000)

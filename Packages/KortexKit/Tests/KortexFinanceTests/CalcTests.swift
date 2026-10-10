@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import KortexFinance
 
@@ -25,6 +26,29 @@ struct CalendarTests {
         #expect(day(2026, 9, 29).adding(days: 3) == day(2026, 10, 2))
         #expect(day(2026, 10, 1).isoWeekday == 4, "1 Oct 2026 is a Thursday")
         #expect(day(2026, 9, 29).days(to: day(2026, 10, 6)) == 7)
+    }
+
+    @Test func dateConversionIsGregorianWhateverTheMacCalendar() {
+        let zones = ["UTC", "Asia/Kolkata", "America/Los_Angeles", "Pacific/Kiritimati"].map { TimeZone(identifier: $0)! }
+        for zone in zones {
+            for d in [day(2026, 9, 1), day(2026, 10, 11), day(2024, 2, 29), day(2026, 12, 31)] {
+                #expect(LocalDay(date: d.date(in: zone), in: zone) == d)
+            }
+        }
+
+        // Days that broke `Calendar.current`: Hebrew month 13 and Hebrew day 30, plus Japanese era years.
+        let utc = TimeZone(identifier: "UTC")!
+        func noon(_ d: LocalDay) -> Date { LocalDay.calendar(in: utc).date(from: DateComponents(year: d.year, month: d.month, day: d.day, hour: 12))! }
+        var hebrew = Calendar(identifier: .hebrew)
+        hebrew.timeZone = utc
+        #expect(hebrew.component(.month, from: noon(day(2026, 9, 1))) == 13)
+        #expect(LocalDay(date: noon(day(2026, 9, 1)), in: utc) == day(2026, 9, 1))
+        #expect(hebrew.component(.day, from: noon(day(2026, 10, 11))) == 30)
+        #expect(LocalDay(date: noon(day(2026, 10, 11)), in: utc) == day(2026, 10, 11))
+        var japanese = Calendar(identifier: .japanese)
+        japanese.timeZone = utc
+        #expect(japanese.component(.year, from: noon(day(2026, 10, 10))) != 2026)
+        #expect(LocalDay(date: noon(day(2026, 10, 10)), in: utc) == day(2026, 10, 10))
     }
 }
 
