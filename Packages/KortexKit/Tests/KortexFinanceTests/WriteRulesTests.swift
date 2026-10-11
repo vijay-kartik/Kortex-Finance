@@ -37,6 +37,37 @@ struct FinanceIdsTests {
         #expect(FinanceIds.random().allSatisfy { !$0.isUppercase })
     }
 
+    /// Android's FinanceIdsTest vectors, and what its `trim()` and non-Unicode `\s+` make of other
+    /// whitespace: trimmed at the ends, kept as it is inside.
+    @Test func payeeKeysMatchAndroid() {
+        #expect(FinanceIds.payeeKey("  WHOLE FOODS \t MARKET ") == "whole foods market")
+        #expect(FinanceIds.payeeKey("PaytmQR2810050@paytm") == "paytmqr2810050@paytm")
+        #expect(FinanceIds.merchant("WHOLE FOODS  MARKET") == FinanceIds.merchant("Whole Foods Market"))
+
+        let vectors: [(String, String)] = [
+            ("AMAZON\u{00A0}PAY", "amazon\u{00A0}pay"),
+            ("\u{00A0}AMAZON PAY\u{00A0}", "amazon pay"),
+            ("Swiggy\u{2009} \u{2009}BLR", "swiggy\u{2009} \u{2009}blr"),
+            ("\u{202F}Zomato\u{202F}Ltd\u{202F}", "zomato\u{202F}ltd"),
+            ("\u{3000}A\u{3000}B\u{3000}", "a\u{3000}b"),
+            ("\u{1F}A\u{1F}B\u{1F}", "a\u{1F}b"),
+            ("A \n\u{0B}\u{0C}\r B", "a b"),
+            ("\u{0085}A\u{0085}", "\u{0085}a\u{0085}"),
+        ]
+        for (raw, key) in vectors {
+            #expect(FinanceIds.payeeKey(raw) == key, "\(raw.unicodeScalars.map(\.value))")
+            #expect(FinanceIds.merchant(raw) == "mer_" + FinanceIds.hash(key))
+        }
+        #expect(FinanceIds.merchant("AMAZON\u{00A0}PAY") != FinanceIds.merchant("AMAZON PAY"))
+    }
+
+    @Test func trimsAsKotlinDoes() {
+        #expect("\u{00A0}\u{2009} Bananas \u{3000}\n".cleaned == "Bananas")
+        #expect("\u{202F}\u{1F}\n".cleaned == nil)
+        #expect(FinanceIds.smsTransaction(sender: "\u{00A0}vm-hdfcbk\u{2009}", body: "\u{3000}Rs.42.50 spent\u{00A0}\n")
+                == FinanceIds.smsTransaction(sender: "VM-HDFCBK", body: "Rs.42.50 spent"))
+    }
+
     @Test func clockDatesLikeAndroid() {
         #expect(clock.today == day(2026, 9, 29))
         #expect(clock.millisOn(day(2026, 9, 29)) == clock.nowMillis, "today is now")

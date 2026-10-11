@@ -47,7 +47,7 @@ public struct TransactionDraft: Sendable {
 extension String {
     /// Trimmed, nil when empty: kortex's `clean()`.
     var cleaned: String? {
-        let t = trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = kotlinTrimmed
         return t.isEmpty ? nil : t
     }
 }
