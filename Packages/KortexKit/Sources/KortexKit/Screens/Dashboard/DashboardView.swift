@@ -56,7 +56,7 @@ struct DashboardView: View {
         }
         return equalHeightRow {
             KPITile(label: "TOTAL BALANCE", value: Money.format(m.totalBalanceMinor),
-                    sub: m.accountCount == 1 ? "1 account" : "\(m.accountCount) accounts")
+                    sub: Format.count(m.accountCount, "account"))
             KPITile(label: "PENDING", value: Money.format(m.pending.totalMinor, wholeUnits: true),
                     sub: m.pending.count == 0 ? "Nothing due in 30 days" : "\(m.pending.count) due · next 30 days",
                     subColor: m.pending.count == 0 ? .kMuted : .kAmber)

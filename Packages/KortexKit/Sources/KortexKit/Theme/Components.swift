@@ -158,5 +158,10 @@ enum Format {
         day.date.formatted(.dateTime.weekday(.wide).day().month(.wide))
     }
 
-    static func points(_ n: Int) -> String { n == 1 ? "1 point" : "\(n) points" }
+    /// "1 entry", "3 entries".
+    static func count(_ n: Int, _ one: String, _ many: String? = nil) -> String {
+        "\(n) \(n == 1 ? one : many ?? one + "s")"
+    }
+
+    static func points(_ n: Int) -> String { count(n, "point") }
 }

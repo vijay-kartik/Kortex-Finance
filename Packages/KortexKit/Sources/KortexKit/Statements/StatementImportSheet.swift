@@ -148,7 +148,7 @@ struct StatementImportSheet: View {
     private func subtitle(_ a: ExtractedAccount) -> String {
         let kind = switch a.kind { case .bank: "Bank account"; case .credit_card: "Credit card"; case .loan: "Loan"; case .other: "Account" }
         let number = a.numberLast4.map { d in "••" + String(d.filter(\.isASCIIDigitForUI).suffix(4)) }
-        let count = a.transactions.count == 1 ? "1 transaction" : "\(a.transactions.count) transactions"
+        let count = Format.count(a.transactions.count, "transaction")
         let known = target(for: a).flatMap { finance.data.accounts[$0] }.map { "goes into \($0.name)" }
         return [kind, number, count, known].compactMap { $0 }.joined(separator: " · ")
     }
@@ -350,7 +350,7 @@ struct StatementImportSheet: View {
                 }
                 ForEach(pays.keys.sorted(), id: \.self) { uid in
                     let n = pays[uid]?.count ?? 0
-                    LabeledContent("Pays \(finance.data.recurring[uid]?.name ?? "a recurring payment")", value: n == 1 ? "1 entry" : "\(n) entries")
+                    LabeledContent("Pays \(finance.data.recurring[uid]?.name ?? "a recurring payment")", value: Format.count(n, "entry", "entries"))
                 }
                 Text("Change any row in the Repeats column. Reminders and auto-pay can be set in Recurring afterwards.")
                     .font(.grotesk(11)).foregroundStyle(Color.kMuted)
@@ -418,7 +418,7 @@ struct StatementImportSheet: View {
 
     private func footer(_ s: StatementImport) -> some View {
         let n = s.rows.filter(\.include).count
-        let entries = n == 1 ? "1 entry" : "\(n) entries"
+        let entries = Format.count(n, "entry", "entries")
         let into = s.existingAccountUid.flatMap { finance.data.accounts[$0] }
         return HStack(spacing: 12) {
             if let error { Label(error, systemImage: "exclamationmark.triangle").font(.grotesk(12)).foregroundStyle(Color.kAlarm).lineLimit(2) }
