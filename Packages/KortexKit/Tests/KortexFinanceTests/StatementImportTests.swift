@@ -271,6 +271,37 @@ struct StatementImportTests {
         #expect(r.kortexClosingMinor + 99_900 == s.closingMinor, "only the entry missing from the statement keeps Kortex off")
     }
 
+    @Test func theCheckAgainstKortexReadsOnlyTheAccountsLedger() throws {
+        var data = existingBank([
+            entry("before", .expense, 10_000, on: "2026-08-20", merchant: "Croma"),
+            entry("swiggy", .expense, 25_050, on: "2026-09-02", merchant: "Swiggy"),
+            entry("in", .transfer, 200_000, on: "2026-09-12", account: "savings", to: "bank"),
+            entry("spend", .expense, 40_000, on: "2026-09-18", account: "debit", merchant: "Zara"),
+            entry("bill", .cardPayment, 500_000, on: "2026-09-25", to: "card"),
+            entry("elsewhere", .expense, 70_000, on: "2026-09-15", account: "savings", merchant: "Amazon"),
+            entry("after", .expense, 15_000, on: "2026-10-03", merchant: "Uber"),
+        ])
+        var debit = account("debit", .debitCard, last4: "5555")
+        debit.linkedAccountUid = "bank"
+        data.apply([RemoteRow.live(account("savings", .bank, last4: "7777")), RemoteRow.live(debit)])
+        let s = StatementImportRules.prepare(bank([
+            tx("2026-09-02", "UPI/DR/4411/SWIGGY", 250.50, .debit, balance: nil, merchant: "Swiggy"),
+            tx("2026-09-05", "NEFT SALARY ACME", 50_000, .credit, balance: nil, merchant: "Acme"),
+        ]), into: "bank", in: data, today: today)
+        #expect(s.rows.map { $0.match?.transactionUid } == ["swiggy", nil])
+
+        let r = try #require(s.reconciliation(in: data))
+        #expect(r.kortexOpeningMinor == 1_000_000 - 10_000)
+        #expect(r.kortexClosingMinor == 990_000 - 25_050 + 200_000 - 40_000 - 500_000 + 5_000_000)
+        #expect(r.notOnStatement.map(\.uid) == ["in", "spend", "bill"], "the debit card's spend is the bank's; the other account's isn't")
+
+        // What scanning every transaction gives.
+        let bank = try #require(data.accounts["bank"])
+        let all = Array(data.transactions.values)
+        #expect(r.kortexOpeningMinor == Balances.balance(of: bank, transactions: all, accounts: data.accounts, upTo: s.openingOn.adding(days: -1)))
+        #expect(r.kortexClosingMinor == Balances.balance(of: bank, transactions: all, accounts: data.accounts, upTo: s.closingOn) + 5_000_000)
+    }
+
     @Test func eachEntryMatchesOneRowTheClosestFirst() {
         let data = existingBank([entry("coffee", .expense, 20_000, on: "2026-09-03", merchant: "Cafe")])
         let s = StatementImportRules.prepare(bank([

@@ -193,19 +193,29 @@ public struct StatementImport: Sendable {
     public var reconciles: Bool? { closingMinor.map { $0 == computedClosingMinor } }
 
     /// Importing into an account you have: Kortex's balance either side of the statement, once the
-    /// included rows are added, and the entries Kortex has in its dates that no row matched.
+    /// included rows are added, and the entries Kortex has in its dates that no row matched. One pass
+    /// over the account's ledger entries: nothing off its ledger moves its balance.
     public func reconciliation(in data: FinanceData) -> ImportReconciliation? {
         guard let uid = existingAccountUid, let account = data.accounts[uid] else { return nil }
-        let txs = data.transactions.values
+        let ledgerAccount = data.accounts[Balances.ledger(of: uid, in: data.accounts)] ?? account
         let matched = Set(rows.compactMap { $0.match?.transactionUid })
         let added = rows.filter(\.include).reduce(Int64(0)) { $0 + StatementImport.effect($1, kind: account.kind) }
+        var opening: Int64 = 0, closing: Int64 = 0
+        var notOnStatement: [Transaction] = []
+        for tx in data.ledgerEntries(of: account) {
+            let effect = Balances.effect(of: tx, on: ledgerAccount, accounts: data.accounts)
+            guard effect != 0, tx.occurredOn <= closingOn else { continue }
+            closing += effect
+            if tx.occurredOn < openingOn {
+                opening += effect
+            } else if tx.type != .opening && !matched.contains(tx.uid) {
+                notOnStatement.append(tx)
+            }
+        }
         return ImportReconciliation(
-            kortexOpeningMinor: Balances.balance(of: account, transactions: txs, accounts: data.accounts, upTo: openingOn.adding(days: -1)),
-            kortexClosingMinor: Balances.balance(of: account, transactions: txs, accounts: data.accounts, upTo: closingOn) + added,
-            notOnStatement: txs.filter { tx in
-                tx.type != .opening && tx.occurredOn >= openingOn && tx.occurredOn <= closingOn && !matched.contains(tx.uid)
-                    && Balances.effect(of: tx, on: account, accounts: data.accounts) != 0
-            }.sorted { ($0.occurredOn, $0.occurredAtMillis) < ($1.occurredOn, $1.occurredAtMillis) }
+            kortexOpeningMinor: opening,
+            kortexClosingMinor: closing + added,
+            notOnStatement: notOnStatement.sorted { ($0.occurredOn, $0.occurredAtMillis) < ($1.occurredOn, $1.occurredAtMillis) }
         )
     }
 
