@@ -56,6 +56,9 @@ The account sheet's Number field takes the full number or just the last 4, as on
 number is sealed on this Mac (`KortexFinance.SecretBox`: AES-256-GCM in Tink's layout, bound to the
 account's uid) with the user's data key and written to `finSecrets`, in the same batch as the account
 and its `hasSecret`. Show reads it back after Touch ID or the Mac's password; it's never listened to.
+Copy puts it on this Mac's pasteboard only (not Universal Clipboard), marked with the nspasteboard.org
+concealed and transient types so clipboard managers don't record it, and clears it after a minute
+unless something else has been copied since (`KortexKit.SensitivePasteboard`).
 
 The data key comes from the `financeKey` function, which enforces App Check, and is then kept in the
 Keychain (`KortexCloud.FinanceKeys`). App Attest needs a paid Apple Developer membership, so the Mac
