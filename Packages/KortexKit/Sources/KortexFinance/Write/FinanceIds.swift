@@ -23,7 +23,7 @@ public enum FinanceIds {
 
     /// One SMS is one transaction, however often or wherever it's pasted.
     public static func smsTransaction(sender: String, body: String) -> String {
-        "sms_" + hash(sender.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() + "\n" + body.trimmingCharacters(in: .whitespacesAndNewlines))
+        "sms_" + hash(sender.kotlinTrimmed.uppercased() + "\n" + body.kotlinTrimmed)
     }
 
     /// The transaction that pays one occurrence of a recurring payment.
@@ -38,15 +38,62 @@ public enum FinanceIds {
     public static func merchant(_ payeeKey: String) -> String { "mer_" + hash(self.payeeKey(payeeKey)) }
 
     /// How a merchant or UPI id is matched: lowercase, trimmed, inner whitespace collapsed.
+    ///
+    /// Kotlin's `Regex("\\s+")` has no `UNICODE_CHARACTER_CLASS`, so only ASCII whitespace runs
+    /// collapse; a no-break or thin space inside the name is kept as it is. This is on purpose:
+    /// collapsing all Unicode whitespace would give a different key, and so a second merchant, for
+    /// what the phone already learned.
     public static func payeeKey(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        var key = String.UnicodeScalarView()
+        var inRun = false
+        for scalar in raw.kotlinTrimmed.lowercased().unicodeScalars {
+            if javaSpace.contains(scalar) {
+                if !inRun { key.append(" ") }
+                inRun = true
+            } else {
+                key.append(scalar)
+                inRun = false
+            }
+        }
+        return String(key)
     }
+
+    /// Java's `\s` without `UNICODE_CHARACTER_CLASS`: `[ \t\n\x0B\f\r]`.
+    private static let javaSpace: Set<Unicode.Scalar> = [" ", "\t", "\n", "\u{0B}", "\u{0C}", "\r"]
 
     /// First 32 hex characters of SHA-256 of the UTF-8 text.
     static func hash(_ text: String) -> String {
         SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined().prefix(32).description
     }
+}
+
+extension Unicode.Scalar {
+    /// Kotlin's `Char.isWhitespace()` on the JVM (Java's `isWhitespace || isSpaceChar`), which its
+    /// `trim()` and `isBlank()` use: tab to carriage return, U+001C–U+001F, and every space, line and
+    /// paragraph separator, no-break spaces included. Unlike Swift's `isWhitespace`, not U+0085.
+    var isKotlinWhitespace: Bool {
+        switch value {
+        case 0x09...0x0D, 0x1C...0x1F: return true
+        default:
+            switch properties.generalCategory {
+            case .spaceSeparator, .lineSeparator, .paragraphSeparator: return true
+            default: return false
+            }
+        }
+    }
+}
+
+extension String {
+    /// Kotlin's `trim()`.
+    var kotlinTrimmed: String {
+        let scalars = unicodeScalars
+        guard let first = scalars.firstIndex(where: { !$0.isKotlinWhitespace }),
+              let last = scalars.lastIndex(where: { !$0.isKotlinWhitespace }) else { return "" }
+        return String(scalars[first...last])
+    }
+
+    /// Kotlin's `isBlank()`.
+    var isKotlinBlank: Bool { unicodeScalars.allSatisfy(\.isKotlinWhitespace) }
 }
 
 /// "Now" and the device's zone, as kortex's port/Clock.kt uses them to date entries.

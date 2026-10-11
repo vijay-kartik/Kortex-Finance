@@ -60,6 +60,13 @@ struct FinanceDocsTests {
         var zero = expense
         zero["amountMinor"] = 0
         #expect(FinanceDocs.transaction(uid: "t", zero) == nil)
+
+        // Blank as Kotlin's isBlank() sees it, newlines and no-break spaces included.
+        for blank in ["\n", " \t\r\n", "\u{00A0}", "\u{3000}\u{1F}"] {
+            var noAccount = expense
+            noAccount["accountUid"] = blank
+            #expect(FinanceDocs.transaction(uid: "t", noAccount) == nil, "accountUid \(blank.unicodeScalars.map(\.value))")
+        }
     }
 
     @Test func syncedCategoriesNeverReplaceBuiltIns() {

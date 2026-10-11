@@ -198,7 +198,7 @@ private extension Dictionary where Key == String, Value == Any {
     }
 
     func text(_ key: String) -> String? {
-        guard let s = self[key] as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        guard let s = self[key] as? String, !s.isKotlinBlank else { return nil }
         return s
     }
 
