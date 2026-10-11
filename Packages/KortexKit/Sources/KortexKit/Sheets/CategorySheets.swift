@@ -33,11 +33,9 @@ struct CategorySheet: View {
         ) {
             if editing == nil {
                 Section {
-                    Picker("Type", selection: $kind) {
-                        Text("Expense").tag(CategoryKind.expense)
-                        Text("Income").tag(CategoryKind.income)
+                    LabeledContent("Type") {
+                        KSegmented("Type", selection: $kind, options: [(CategoryKind.expense, "Expense"), (.income, "Income")])
                     }
-                    .pickerStyle(.segmented)
                 } footer: {
                     Text(kind == .expense ? "Shows up when you add an expense." : "Shows up when you add income.")
                         .font(.grotesk(11)).foregroundStyle(Color.kMuted)

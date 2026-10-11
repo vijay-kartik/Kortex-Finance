@@ -43,12 +43,8 @@ struct CardsView: View {
             }
             if cards.count > 1 {
                 ToolbarItem(placement: .principal) {
-                    Picker("Card", selection: Binding(get: { selected?.uid ?? "" }, set: { model.selectedCardUid = $0 })) {
-                        ForEach(cards) { card in Text(card.last4.map { "\(card.name) ••\($0)" } ?? card.name).tag(card.uid) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    KSegmented("Card", selection: Binding(get: { selected?.uid ?? "" }, set: { model.selectedCardUid = $0 }),
+                               options: cards.map { card in (card.uid, card.last4.map { "\(card.name) ••\($0)" } ?? card.name) })
                 }
             }
         }
