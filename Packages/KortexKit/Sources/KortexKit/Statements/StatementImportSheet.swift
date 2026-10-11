@@ -30,6 +30,7 @@ struct StatementImportSheet: View {
     @State private var current: ExtractedAccount?
     /// The account it goes into was found by its last 4 digits rather than picked.
     @State private var foundByNumber = false
+    @State private var summaries = ReviewSummaries()
 
     private var model: AIModel { AIModel(rawValue: modelID) ?? .default }
 
@@ -264,7 +265,7 @@ struct StatementImportSheet: View {
         let isCard = account.kind == .creditCard
         let matched = s.rows.filter { $0.match != nil }.count
         let toAdd = s.rows.filter(\.include).count
-        let r = s.reconciliation(in: finance.data)
+        let r = summaries.reconciliation(s, in: finance.data)
         let day = { (d: LocalDay) in d.date.formatted(.dateTime.day().month(.abbreviated)) }
         return VStack(alignment: .leading, spacing: 6) {
             Text("CHECK AGAINST KORTEX").sectionLabelStyle()
@@ -326,7 +327,7 @@ struct StatementImportSheet: View {
 
     /// What the Repeats column will do on saving.
     @ViewBuilder private func recurring(_ s: StatementImport) -> some View {
-        let starts = StatementImportRules.newRecurring(s)
+        let starts = summaries.newRecurring(s)
         let paying = s.rows.filter { $0.include && $0.kind == .expense }.compactMap { row -> String? in
             if case .pays(let uid) = row.repeats { uid } else { nil }
         }
@@ -530,6 +531,67 @@ struct StatementImportSheet: View {
 
 extension Character {
     var isASCIIDigitForUI: Bool { ("0"..."9").contains(self) }
+}
+
+/// The side pane's check against Kortex and new recurring payments, kept until what they're worked
+/// out from changes. Every edit re-renders the review, and typing a row's details or merchant mostly
+/// changes neither. Not observed: it only remembers.
+@MainActor
+final class ReviewSummaries {
+    /// What `reconciliation(in:)` reads: each row's figures, and the account's ledger.
+    private struct ReconciliationInputs: Equatable {
+        struct Figures: Equatable {
+            var include: Bool
+            var kind: ImportRow.Kind
+            var amountMinor: Int64
+            var matched: String?
+        }
+
+        var existingAccountUid: String?
+        var openingOn: LocalDay
+        var closingOn: LocalDay
+        var rows: [Figures]
+        var ledger: [Entry]
+        var accounts: [String: Account]
+    }
+
+    /// What `newRecurring` reads: the rows starting a payment, whole since a payment's name is its merchant's.
+    private struct RecurringInputs: Equatable {
+        var accountUid: String
+        var starting: [ImportRow]
+        var frequencies: [String: Frequency]
+    }
+
+    private var reconciliation: (inputs: ReconciliationInputs, result: ImportReconciliation?)?
+    private var recurring: (inputs: RecurringInputs, result: [Recurring])?
+
+    func reconciliation(_ s: StatementImport, in data: FinanceData) -> ImportReconciliation? {
+        let inputs = ReconciliationInputs(
+            existingAccountUid: s.existingAccountUid, openingOn: s.openingOn, closingOn: s.closingOn,
+            rows: s.rows.map { .init(include: $0.include, kind: $0.kind, amountMinor: $0.amountMinor, matched: $0.match?.transactionUid) },
+            ledger: s.existingAccountUid.flatMap { data.accounts[$0] }.map(data.ledgerEntries) ?? [],
+            accounts: data.accounts
+        )
+        if let reconciliation, reconciliation.inputs == inputs { return reconciliation.result }
+        let result = s.reconciliation(in: data)
+        reconciliation = (inputs, result)
+        return result
+    }
+
+    func newRecurring(_ s: StatementImport) -> [Recurring] {
+        let inputs = RecurringInputs(
+            accountUid: s.accountUid,
+            starting: s.rows.filter { row in
+                guard row.include, row.kind == .expense, case .new = row.repeats else { return false }
+                return true
+            },
+            frequencies: s.frequencies
+        )
+        if let recurring, recurring.inputs == inputs { return recurring.result }
+        let result = StatementImportRules.newRecurring(s)
+        recurring = (inputs, result)
+        return result
+    }
 }
 
 extension StatementImport {

@@ -25,10 +25,20 @@ struct StatementRowsTable: View {
     @Binding var draft: StatementImport
     let data: FinanceData
     let filter: RowFilter
+    /// Where each row is in `draft.rows`, by id, so a cell's binding finds its row without a search.
+    private let positions: [Int: Int]
+
+    init(draft: Binding<StatementImport>, data: FinanceData, filter: RowFilter) {
+        _draft = draft
+        self.data = data
+        self.filter = filter
+        positions = Dictionary(draft.wrappedValue.rows.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
 
     var body: some View {
         let isCard = draft.account.kind == .creditCard
         let rows = draft.rows.filter(filter.admits)
+        let categories = Dictionary(grouping: data.categories.values.sorted { $0.name < $1.name }, by: \.kind)
         let payFrom = data.accounts.values.filter { !$0.archived && !$0.kind.isCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let cards = data.accounts.values.filter { !$0.archived && $0.kind == .creditCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let mine = StatementImportRules.transferAccounts(into: draft.existingAccountUid, in: data)
@@ -110,7 +120,7 @@ struct StatementRowsTable: View {
                     let kind: CategoryKind = row.kind == .income ? .income : .expense
                     Picker("", selection: bind(row, \.categoryUid)) {
                         Text("Uncategorised").tag(String?.none)
-                        ForEach(data.categories.values.filter { $0.kind == kind }.sorted { $0.name < $1.name }) { c in
+                        ForEach(categories[kind] ?? []) { c in
                             Text(c.name).tag(String?.some(c.uid))
                         }
                     }
@@ -155,7 +165,10 @@ struct StatementRowsTable: View {
 
     // Bindings into `draft.rows` by row id, so the filtered view edits the real rows.
 
-    private func index(_ row: ImportRow) -> Int? { draft.rows.firstIndex { $0.id == row.id } }
+    private func index(_ row: ImportRow) -> Int? {
+        if let i = positions[row.id], draft.rows.indices.contains(i), draft.rows[i].id == row.id { return i }
+        return draft.rows.firstIndex { $0.id == row.id }
+    }
 
     private func bind<T>(_ row: ImportRow, _ path: WritableKeyPath<ImportRow, T>) -> Binding<T> {
         Binding(get: { index(row).map { draft.rows[$0][keyPath: path] } ?? row[keyPath: path] },
