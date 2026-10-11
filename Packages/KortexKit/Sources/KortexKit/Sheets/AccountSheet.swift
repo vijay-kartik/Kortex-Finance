@@ -19,6 +19,7 @@ struct AccountSheet: View {
     @State private var saving = false
     @State private var revealed: String?
     @State private var revealing = false
+    @State private var copied = false
 
     init(finance: any FinanceStore, editing: Account?, kind: AccountKind = .bank, close: @escaping () -> Void) {
         self.finance = finance
@@ -111,11 +112,11 @@ struct AccountSheet: View {
                 HStack(spacing: 8) {
                     if let revealed {
                         Text(AccountNumbers.grouped(revealed)).font(.mono(13)).textSelection(.enabled)
-                        Button("Copy") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(revealed, forType: .string)
+                        Button(copied ? "Copied, clears in 1 min" : "Copy") {
+                            SensitivePasteboard.copy(revealed)
+                            copied = true
                         }
-                        Button("Hide") { self.revealed = nil }
+                        Button("Hide") { self.revealed = nil; copied = false }
                     } else {
                         Text("Kept encrypted").foregroundStyle(Color.kMuted)
                         Button(revealing ? "Opening…" : "Show") { reveal(editing) }.disabled(revealing)
