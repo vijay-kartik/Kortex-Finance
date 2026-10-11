@@ -176,17 +176,17 @@ struct SidebarView: View {
 
     private func leftoversTitle(_ l: AccountRules.Leftovers) -> String {
         l.entries.isEmpty ? "Tidy up entries of deleted accounts?"
-            : "Remove \(l.entries.count == 1 ? "1 entry" : "\(l.entries.count) entries") of deleted accounts?"
+            : "Remove \(Format.count(l.entries.count, "entry", "entries")) of deleted accounts?"
     }
 
     /// What Remove does, part by part.
     private func leftoversMessage(_ l: AccountRules.Leftovers) -> String {
         var parts: [String] = []
         if !l.entries.isEmpty { parts.append("Their entries are removed here and on your phone.") }
-        if !l.bills.isEmpty { parts.append("\(l.bills.count == 1 ? "1 bill" : "\(l.bills.count) bills") of deleted cards \(l.bills.count == 1 ? "goes" : "go") too.") }
+        if !l.bills.isEmpty { parts.append("\(Format.count(l.bills.count, "bill")) of deleted cards \(l.bills.count == 1 ? "goes" : "go") too.") }
         if !l.relabeled.isEmpty {
             let n = l.relabeled.count
-            parts.append("\(n == 1 ? "1 transfer or payment" : "\(n) transfers and payments") with accounts you still have "
+            parts.append("\(Format.count(n, "transfer or payment", "transfers and payments")) with accounts you still have "
                 + "\(n == 1 ? "stays" : "stay"), shown as from an unknown account instead, so those balances don't change.")
         }
         return parts.joined(separator: " ") + " This can't be undone."
@@ -199,7 +199,7 @@ struct SidebarView: View {
         let parts = [(data.accounts.count, "account or card", "accounts and cards"), (data.transactions.count, "entry", "entries"),
                      (data.recurring.count, "recurring payment", "recurring payments"), (custom, "category", "categories")]
             .filter { $0.0 > 0 }
-            .map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
+            .map { Format.count($0.0, $0.1, $0.2) }
         guard !parts.isEmpty else { return "" }
         return (parts.count == 1 ? parts[0] : parts.dropLast().joined(separator: ", ") + " and " + parts.last!) + ". "
     }

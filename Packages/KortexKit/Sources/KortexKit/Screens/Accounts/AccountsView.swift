@@ -32,7 +32,7 @@ struct AccountsView: View {
         }
         .background(Color.kVoid)
         .navigationTitle("Accounts")
-        .navigationSubtitle(accounts.count == 1 ? "1 account" : "\(accounts.count) accounts")
+        .navigationSubtitle(Format.count(accounts.count, "account"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -174,9 +174,9 @@ struct AccountDetail: View {
             }
             HStack(alignment: .top, spacing: 16) {
                 KPITile(label: "IN · \(monthName)", value: Money.format(flow.inMinor),
-                        sub: flow.inCount == 1 ? "1 entry" : "\(flow.inCount) entries")
+                        sub: Format.count(flow.inCount, "entry", "entries"))
                 KPITile(label: "OUT · \(monthName)", value: Money.format(flow.outMinor),
-                        sub: flow.outCount == 1 ? "1 entry" : "\(flow.outCount) entries")
+                        sub: Format.count(flow.outCount, "entry", "entries"))
                 KPITile(label: "NET", value: Money.format(flow.netMinor, signed: true),
                         sub: "vs \(Money.format(lastFlow.netMinor, signed: true)) in \(Format.monthName(month.adding(months: -1)))",
                         subColor: .kMuted)
@@ -186,7 +186,7 @@ struct AccountDetail: View {
                 HStack {
                     Text("Entries in this account").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
                     Spacer()
-                    Text(entries.count == 1 ? "1 entry" : "\(entries.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                    Text(Format.count(entries.count, "entry", "entries")).font(.grotesk(12)).foregroundStyle(Color.kMuted)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -344,7 +344,7 @@ struct DeleteAccountConfirmation: ViewModifier {
         var text = "Delete its entries too, or keep them in your history, shown as from a deleted account."
         let kept = found.relabeled.count
         if kept > 0 {
-            text += " Deleting them keeps \(kept == 1 ? "1 transfer or payment" : "\(kept) transfers and payments") with accounts you "
+            text += " Deleting them keeps \(Format.count(kept, "transfer or payment", "transfers and payments")) with accounts you "
                 + "still have, shown as from an unknown account, so those balances don't change."
         }
         return text + " This applies on your phone too."

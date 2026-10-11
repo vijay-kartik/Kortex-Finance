@@ -70,7 +70,7 @@ struct ExpensesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.kVoid)
         .navigationTitle("Expenses")
-        .navigationSubtitle(inPeriod.count == 1 ? "1 entry" : "\(inPeriod.count) entries")
+        .navigationSubtitle(Format.count(inPeriod.count, "entry", "entries"))
         .toolbar { toolbar(today: today) }
         .sidePanel(isPresented: showsInspector) {
             let selected = model.selectedEntryUids.compactMap { data.transactions[$0] }
@@ -259,7 +259,7 @@ struct ExpensesView: View {
         let out = shown.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
         let inn = shown.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
         return HStack(spacing: 16) {
-            Text(shown.count == 1 ? "1 entry" : "\(shown.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+            Text(Format.count(shown.count, "entry", "entries")).font(.grotesk(12)).foregroundStyle(Color.kMuted)
             Spacer()
             Text("Out \(Money.format(out))").font(.mono(12)).foregroundStyle(Color.kMuted)
             Text("In \(Money.format(inn))").font(.mono(12)).foregroundStyle(Color.kGrowth)

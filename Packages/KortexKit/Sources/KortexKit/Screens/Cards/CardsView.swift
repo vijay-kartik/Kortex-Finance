@@ -34,7 +34,7 @@ struct CardsView: View {
         }
         .background(Color.kVoid)
         .navigationTitle(cards.count == 1 || cards.isEmpty ? "Cards" : "Cards")
-        .navigationSubtitle(cards.count == 1 ? "1 card" : "\(cards.count) cards")
+        .navigationSubtitle(Format.count(cards.count, "card"))
         .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance) { model.selectedCardUid = nil })
         .modifier(DeleteEntriesConfirmation(deleting: $deletingEntries, finance: finance, model: model))
         .toolbar {
@@ -101,7 +101,7 @@ struct CardDetail: View {
             HStack {
                 Text("Entries on this card").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
                 Spacer()
-                Text(list.count == 1 ? "1 entry" : "\(list.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                Text(Format.count(list.count, "entry", "entries")).font(.grotesk(12)).foregroundStyle(Color.kMuted)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

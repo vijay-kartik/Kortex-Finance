@@ -106,10 +106,10 @@ private struct EntryMenu: View {
             Divider()
         }
         if !expenses.isEmpty {
-            categories(.expense, title: income.isEmpty ? "Category" : "Category for \(count(expenses.count, "Expense"))", current: expenses)
+            categories(.expense, title: income.isEmpty ? "Category" : "Category for \(Format.count(expenses.count, "Expense"))", current: expenses)
         }
         if !income.isEmpty {
-            categories(.income, title: expenses.isEmpty ? "Category" : "Category for \(count(income.count, "Income Entry", "Income Entries"))", current: income)
+            categories(.income, title: expenses.isEmpty ? "Category" : "Category for \(Format.count(income.count,"Income Entry", "Income Entries"))", current: income)
         }
         if (expenses + income).contains(where: { $0.categoryUid != nil }) {
             Button("Remove Category") { act(.setCategory(nil)) }
@@ -130,9 +130,5 @@ private struct EntryMenu: View {
                 Toggle(c.name, isOn: Binding(get: { shared == c.uid }, set: { _ in act(.setCategory(c.uid)) }))
             }
         }
-    }
-
-    private func count(_ n: Int, _ one: String, _ many: String? = nil) -> String {
-        n == 1 ? "1 \(one)" : "\(n) \(many ?? one + "s")"
     }
 }
