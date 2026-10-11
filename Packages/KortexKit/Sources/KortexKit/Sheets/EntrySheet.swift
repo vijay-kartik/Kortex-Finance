@@ -120,13 +120,11 @@ struct EntrySheet: View {
             onPrimary: save
         ) {
             if canChangeType {
-                Picker("Type", selection: $type) {
-                    Text("Expense").tag(TransactionType.expense)
-                    Text("Income").tag(TransactionType.income)
-                    Text("Transfer").tag(TransactionType.transfer)
-                    if canBeCardPayment { Text("Card bill").tag(TransactionType.cardPayment) }
+                LabeledContent("Type") {
+                    KSegmented("Type", selection: $type, options: [
+                        (TransactionType.expense, "Expense"), (.income, "Income"), (.transfer, "Transfer"),
+                    ] + (canBeCardPayment ? [(.cardPayment, "Card bill")] : []))
                 }
-                .pickerStyle(.segmented)
                 .onChange(of: type) { _, new in
                     categoryUid = editing.flatMap { $0.type == new ? $0.categoryUid : nil }
                     categoryTouched = editing != nil

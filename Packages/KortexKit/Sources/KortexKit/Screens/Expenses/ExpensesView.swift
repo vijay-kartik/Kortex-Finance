@@ -36,12 +36,7 @@ struct ExpensesView: View {
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
                 PanelHeader(title: "Entries") {
-                    Picker("Show", selection: $filter) {
-                        ForEach(Filter.allCases, id: \.self) { Text($0.rawValue) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    KSegmented("Show", selection: $filter, options: Filter.allCases.map { ($0, $0.rawValue) })
                 }
                 if shown.isEmpty {
                     Text(inPeriod.isEmpty ? "Nothing added in this period." : "No \(filter.rawValue.lowercased()) in this period.")
@@ -83,12 +78,7 @@ struct ExpensesView: View {
     private func toolbar(today: LocalDay) -> some ToolbarContent {
         ToolbarItem(placement: .principal) {
             HStack(spacing: 12) {
-                Picker("Period", selection: $model.expensesPeriod.mode) {
-                    ForEach(ExpensesMode.allCases, id: \.self) { Text($0.rawValue) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                KSegmented("Period", selection: $model.expensesPeriod.mode, options: ExpensesMode.allCases.map { ($0, $0.rawValue) })
                 ControlGroup {
                     Button { model.expensesPeriod = model.expensesPeriod.previous() } label: { Image(systemName: "chevron.left") }
                         .keyboardShortcut("[", modifiers: .command)

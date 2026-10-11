@@ -44,14 +44,12 @@ struct AccountSheet: View {
             onPrimary: save
         ) {
             if editing == nil {
-                Picker("Kind", selection: $draft.kind) {
-                    Text("Bank").tag(AccountKind.bank)
-                    Text("Credit card").tag(AccountKind.creditCard)
-                    Text("Debit card").tag(AccountKind.debitCard)
-                    Text("Wallet").tag(AccountKind.wallet)
-                    Text("Cash").tag(AccountKind.cash)
+                LabeledContent("Kind") {
+                    KSegmented("Kind", selection: $draft.kind, options: [
+                        (AccountKind.bank, "Bank"), (.creditCard, "Credit card"), (.debitCard, "Debit card"),
+                        (.wallet, "Wallet"), (.cash, "Cash"),
+                    ])
                 }
-                .pickerStyle(.segmented)
             }
             Section {
                 TextField("Name", text: $draft.name, prompt: Text(draft.kind.isCard ? "KORTEX" : "Checking Account"))

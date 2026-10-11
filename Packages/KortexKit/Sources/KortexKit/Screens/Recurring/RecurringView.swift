@@ -63,14 +63,11 @@ struct RecurringView: View {
         .navigationSubtitle("Subscriptions and fixed expenses")
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $filter) {
-                    Text("All \(all.count)").tag(Filter.all)
-                    Text("Subs \(all.filter { $0.kind == .subscription }.count)").tag(Filter.subscriptions)
-                    Text("Fixed \(all.filter { $0.kind == .fixed }.count)").tag(Filter.fixed)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                KSegmented("Show", selection: $filter, options: [
+                    (Filter.all, "ALL \(all.count)"),
+                    (.subscriptions, "SUBS \(all.filter { $0.kind == .subscription }.count)"),
+                    (.fixed, "FIXED \(all.filter { $0.kind == .fixed }.count)"),
+                ], mono: true)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { model.sheet = .recurring(nil) } label: { Label("Add", systemImage: "plus") }

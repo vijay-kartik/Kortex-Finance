@@ -92,12 +92,7 @@ struct CategoriesView: View {
         .navigationSubtitle("\(data.categories.count) categories · \(Format.monthName(month))")
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $filter) {
-                    ForEach(Filter.allCases, id: \.self) { Text($0.rawValue) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                KSegmented("Show", selection: $filter, options: Filter.allCases.map { ($0, $0.rawValue) })
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { model.sheet = .category(nil, filter == .income ? .income : .expense) } label: { Label("New category", systemImage: "plus") }

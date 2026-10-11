@@ -181,6 +181,57 @@ extension ButtonStyle where Self == KortexButtonStyle {
     }
 }
 
+/// The Figma "Segmented": a Panel track with an Edge hairline (radius 8), the selected segment
+/// SynapseDim with a Synapse outline and label (radius 6), the others Muted. Words are Space Grotesk 12
+/// on a 28pt track; `mono` is the compact one for short or counted labels ("3M", "ALL 5"), JetBrains
+/// Mono 11 on 26pt. VoiceOver reads it as a picker.
+struct KSegmented<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let options: [(Value, String)]
+    var mono = false
+
+    init(_ title: String, selection: Binding<Value>, options: [(Value, String)], mono: Bool = false) {
+        self.title = title
+        self._selection = selection
+        self.options = options
+        self.mono = mono
+    }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { i in
+                segment(options[i].0, options[i].1)
+            }
+        }
+        .padding(2)
+        .frame(height: mono ? 26 : 28)
+        .background(Color.kPanel, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.kEdge))
+        .fixedSize()
+        .accessibilityRepresentation {
+            Picker(title, selection: $selection) {
+                ForEach(options.indices, id: \.self) { i in Text(options[i].1).tag(options[i].0) }
+            }
+        }
+    }
+
+    private func segment(_ value: Value, _ label: String) -> some View {
+        let selected = value == selection
+        return Button { selection = value } label: {
+            Text(label)
+                .font(mono ? .mono(11) : .grotesk(12, .medium))
+                .foregroundStyle(selected ? Color.kSynapse : Color.kMuted)
+                .padding(.horizontal, 12)
+                .frame(maxHeight: .infinity)
+                .background(selected ? Color.kSynapseDim : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? Color.kSynapse : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// A hairline between rows.
 struct Hairline: View {
     var body: some View {

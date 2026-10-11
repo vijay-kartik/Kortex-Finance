@@ -39,11 +39,9 @@ struct RecurringSheet: View {
             onPrimary: save
         ) {
             Section {
-                Picker("Type", selection: $draft.kind) {
-                    Text("Subscription").tag(RecurringKind.subscription)
-                    Text("Fixed expense").tag(RecurringKind.fixed)
+                LabeledContent("Type") {
+                    KSegmented("Type", selection: $draft.kind, options: [(RecurringKind.subscription, "Subscription"), (.fixed, "Fixed expense")])
                 }
-                .pickerStyle(.segmented)
             } footer: {
                 Text(draft.kind == .subscription ? "Something you can cancel, like Netflix or Spotify." : "Rent, EMIs, utilities.")
                     .font(.grotesk(11)).foregroundStyle(Color.kMuted)

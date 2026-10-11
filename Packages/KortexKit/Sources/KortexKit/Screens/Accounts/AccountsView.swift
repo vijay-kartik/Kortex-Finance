@@ -160,14 +160,7 @@ struct AccountDetail: View {
                         .font(.grotesk(12))
                         .foregroundStyle(change >= 0 ? Color.kGrowth : Color.kAlarm)
                     Spacer()
-                    Picker("Range", selection: $range) {
-                        Text("30D").tag(30)
-                        Text("90D").tag(90)
-                        Text("1Y").tag(365)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    KSegmented("Range", selection: $range, options: [(30, "30D"), (90, "90D"), (365, "1Y")], mono: true)
                 }
                 BalanceChart(series: series)
                     .frame(height: 160)

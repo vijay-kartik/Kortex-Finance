@@ -125,14 +125,7 @@ struct CashFlowCard: View {
                 legend("In", .kGrowth)
                 legend("Out", .kSynapse)
                 Spacer()
-                Picker("Range", selection: $range) {
-                    Text("3M").tag(3)
-                    Text("6M").tag(6)
-                    Text("1Y").tag(12)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                KSegmented("Range", selection: $range, options: [(3, "3M"), (6, "6M"), (12, "1Y")], mono: true)
             }
             HStack(alignment: .bottom, spacing: 0) {
                 ForEach(shown, id: \.month) { flow in

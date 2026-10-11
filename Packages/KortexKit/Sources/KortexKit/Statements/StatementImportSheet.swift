@@ -404,15 +404,9 @@ struct StatementImportSheet: View {
             Text("Entries").font(.grotesk(15, .medium)).foregroundStyle(Color.kInk)
             Text("\(s.rows.count) read · \(count(.toAdd)) to add").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             Spacer()
-            Picker("Show", selection: $filter) {
-                Text("All").tag(RowFilter.all)
-                Text("To add · \(count(.toAdd))").tag(RowFilter.toAdd)
-                if s.intoExisting { Text("In Kortex · \(count(.inKortex))").tag(RowFilter.inKortex) }
-                Text("To check · \(count(.toCheck))").tag(RowFilter.toCheck)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
+            KSegmented("Show", selection: $filter, options: [(RowFilter.all, "All"), (.toAdd, "To add · \(count(.toAdd))")]
+                + (s.intoExisting ? [(.inKortex, "In Kortex · \(count(.inKortex))")] : [])
+                + [(.toCheck, "To check · \(count(.toCheck))")])
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

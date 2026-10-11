@@ -22,16 +22,10 @@ struct ReportsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 12) {
-                    Picker("Period", selection: Binding(
+                    KSegmented("Period", selection: Binding(
                         get: { model.reportPeriod.mode == .yearly ? ExpensesMode.yearly : .monthly },
                         set: { model.reportPeriod.mode = $0 }
-                    )) {
-                        Text("Month").tag(ExpensesMode.monthly)
-                        Text("Year").tag(ExpensesMode.yearly)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    ), options: [(.monthly, "Month"), (.yearly, "Year")])
                     ControlGroup {
                         Button { model.reportPeriod = reportPeriod.previous() } label: { Image(systemName: "chevron.left") }
                             .keyboardShortcut("[", modifiers: .command)

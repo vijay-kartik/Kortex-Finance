@@ -42,15 +42,12 @@ struct PendingView: View {
         .navigationSubtitle("Next 30 days")
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $filter) {
-                    Text("All \(summary.count)").tag(Filter.all)
-                    Text("Cards \(summary.items.filter { $0.kind == .cardBill }.count)").tag(Filter.cards)
-                    Text("Subs \(summary.items.filter { $0.kind == .subscription }.count)").tag(Filter.subscriptions)
-                    Text("Fixed \(summary.items.filter { $0.kind == .fixed }.count)").tag(Filter.fixed)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                KSegmented("Show", selection: $filter, options: [
+                    (Filter.all, "ALL \(summary.count)"),
+                    (.cards, "CARDS \(summary.items.filter { $0.kind == .cardBill }.count)"),
+                    (.subscriptions, "SUBS \(summary.items.filter { $0.kind == .subscription }.count)"),
+                    (.fixed, "FIXED \(summary.items.filter { $0.kind == .fixed }.count)"),
+                ], mono: true)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { go(.recurring) } label: { Label("Manage recurring", systemImage: "arrow.2.squarepath") }
