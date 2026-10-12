@@ -74,7 +74,7 @@ writes a `deleted: true` marker over each live document (`KortexFinance.ResetRul
 erases them on its next pull, which only sees changed documents and would miss a removal. Built-in
 categories stay, but their budgets are erased. Deleting one of your categories deletes its budget too,
 as on the phone.
-Receipt images in Application Support/Receipts are removed too; settings and the AI key are kept.
+Your receipt images on this Mac are removed too (other accounts' stay); settings and the AI key are kept.
 
 ## Deleted accounts
 
@@ -92,8 +92,10 @@ There is no Paste SMS on the Mac: reading bank SMS is the phone's job. Receipts 
 a photo or PDF on the window, File › Scan Receipt… (⌘O), or File › Import From Device (Continuity
 Camera). `ReceiptScanner` reads them on this Mac with Apple Vision (a digital PDF's own text when it
 has some), grouping words into printed rows; `KortexFinance.ReceiptParser` is a port of Android's
-`domain/read/Receipt.kt`, with its tests. The image is copied to Application Support/Receipts and
-the entry carries that path, as the phone does; images are never uploaded.
+`domain/read/Receipt.kt`, with its tests. The image is copied to Application Support/Receipts/<user uid>
+and the entry carries that path, as the phone does; images are never uploaded. The files belong to the
+store (`KortexFinance.ReceiptFiles`, reached through `FinanceStore.receipts`): an image is copied only
+once the rules accept its entry, and goes when the entry is deleted or its receipt replaced.
 
 ## Import a statement (Mac only)
 

@@ -62,7 +62,7 @@ struct ExpensesView: View {
         .navigationSubtitle(inPeriod.count == 1 ? "1 entry" : "\(inPeriod.count) entries")
         .toolbar { toolbar(today: today) }
         .sidePanel(isPresented: showsInspector) {
-            ExpensesInspector(model: model, data: data, onDelete: { deleting = [$0] })
+            ExpensesInspector(model: model, data: data, receipts: finance.receipts, onDelete: { deleting = [$0] })
         }
         .onDeleteCommand { perform(.delete, on: model.selectedEntryUids) }
         .modifier(DeleteEntriesConfirmation(deleting: $deleting, finance: finance, model: model))
@@ -130,6 +130,7 @@ struct ExpensesView: View {
 private struct ExpensesInspector: View {
     let model: AppModel
     let data: FinanceData
+    let receipts: any ReceiptFiles
     let onDelete: (Entry) -> Void
 
     var body: some View {
@@ -137,7 +138,7 @@ private struct ExpensesInspector: View {
         if selected.count > 1 {
             SelectionSummary(entries: selected)
         } else {
-            EntryInspector(entry: selected.first, data: data,
+            EntryInspector(entry: selected.first, data: data, receipts: receipts,
                            onEdit: { model.sheet = .editEntry($0.uid) }, onDelete: onDelete)
         }
     }

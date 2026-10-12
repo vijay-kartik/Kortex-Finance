@@ -70,30 +70,6 @@ enum ReceiptScanner {
     }
 }
 
-/// Where receipt images are kept: on this Mac only, as on the phone. Entries carry the path.
-enum ReceiptStore {
-    static func keep(_ url: URL, as uid: String) -> (path: String, mime: String)? {
-        let fm = FileManager.default
-        guard let base = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) else { return nil }
-        let folder = base.appendingPathComponent("Receipts", isDirectory: true)
-        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
-        let pdf = ReceiptScanner.isPDF(url)
-        let ext = pdf ? "pdf" : (url.pathExtension.isEmpty ? "jpg" : url.pathExtension.lowercased())
-        let target = folder.appendingPathComponent("\(uid).\(ext)")
-        try? fm.removeItem(at: target)
-        do { try fm.copyItem(at: url, to: target) } catch { return nil }
-        let mime = pdf ? "application/pdf" : (UTType(filenameExtension: ext)?.preferredMIMEType ?? "image/jpeg")
-        return (target.path, mime)
-    }
-
-    /// Reset data: the kept images go with the entries that pointed at them.
-    static func removeAll() {
-        let fm = FileManager.default
-        guard let base = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return }
-        try? fm.removeItem(at: base.appendingPathComponent("Receipts", isDirectory: true))
-    }
-}
-
 /// Turns what arrives by drag-and-drop or Continuity Camera into a file the sheet can read.
 enum ReceiptInput {
     static let types: [UTType] = [.image, .pdf, .fileURL]
