@@ -422,6 +422,33 @@ struct WriteRulesTests {
         #expect(AccountRules.add(AccountDraft(kind: .bank, name: "X", last4: "12a4"), in: data, clock: clock).failure == .invalidLast4)
     }
 
+    @Test func editingChecksAndCleansLikeAdding() throws {
+        let data = sample()
+        func both(_ change: (inout AccountDraft) -> Void) -> [FinanceError?] {
+            var draft = AccountDraft(data.accounts["bank"]!)
+            change(&draft)
+            return [AccountRules.add(draft, in: data, clock: clock).failure, AccountRules.update("bank", draft, in: data, clock: clock).failure]
+        }
+        #expect(both { $0.name = "  " } == [.blankName, .blankName])
+        #expect(both { $0.last4 = "12a4" } == [.invalidLast4, .invalidLast4])
+        #expect(both { $0.dueDay = 32 } == [.invalidDay, .invalidDay])
+        #expect(both { $0.creditLimitMinor = -1 } == [.invalidAmount, .invalidAmount])
+
+        // Fields a bank account doesn't have are cleared, and the rest cleaned, either way.
+        var draft = AccountDraft(kind: .bank, name: " HDFC ", bankType: .savings, ifsc: " hdfc0001234 ",
+                                 creditLimitMinor: 100_000, statementDay: 5, dueDay: 25)
+        let added = writes(AccountRules.add(draft, in: data, clock: clock))
+        let edited = writes(AccountRules.update("bank", draft, in: data, clock: clock))
+        guard case .account(let a) = added.first, case .account(let e) = edited.first else { Issue.record("\(added) \(edited)"); return }
+        for account in [a, e] {
+            #expect(account.name == "HDFC" && account.ifsc == "HDFC0001234" && account.bankType == .savings)
+            #expect(account.creditLimitMinor == nil && account.statementDay == nil && account.dueDay == nil)
+        }
+        draft.kind = .creditCard
+        guard case .account(let kept) = writes(AccountRules.update("bank", draft, in: data, clock: clock)).first else { Issue.record("no account"); return }
+        #expect(kept.kind == .bank && kept.dueDay == nil, "the kind can't change")
+    }
+
     @Test func documentsCarryEveryFieldLikeAndroid() {
         let data = sample()
         guard case .transaction(let tx) = writes(EntryRules.add(TransactionDraft(type: .expense, amountMinor: 4_250, accountUid: "bank"),

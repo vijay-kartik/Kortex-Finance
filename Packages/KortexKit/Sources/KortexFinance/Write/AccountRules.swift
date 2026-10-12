@@ -55,18 +55,13 @@ public enum AccountRules {
     /// alongside, so balances only ever change through entries.
     /// A full number is sealed with `key` into finSecrets, in the same batch as the account.
     public static func add(_ draft: AccountDraft, in data: FinanceData, key: DataKey? = nil, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
-        guard let name = draft.name.cleaned else { return .failure(.blankName) }
-        let number: String?
-        switch AccountNumbers.clean(draft.fullNumber) {
+        let name: String, number: String?, last4: String?
+        switch checked(draft, numberReplacesLast4: false) {
         case .failure(let error): return .failure(error)
-        case .success(let n): number = n
+        case .success(let c): (name, number, last4) = c
         }
-        let last4 = draft.last4?.cleaned ?? number.map { String($0.suffix(4)) }
-        if let last4, last4.count != 4 || !last4.allSatisfy(\.isNumber) { return .failure(.invalidLast4) }
-        if let number, String(number.suffix(4)) != last4 { return .failure(.invalidNumber) }
         if number != nil && key == nil { return .failure(.noFinanceKey) }
-        if [draft.statementDay, draft.dueDay].compactMap({ $0 }).contains(where: { !(1...31).contains($0) }) { return .failure(.invalidDay) }
-        if draft.openingMinor < 0 || (draft.creditLimitMinor ?? 0) < 0 { return .failure(.invalidAmount) }
+        if draft.openingMinor < 0 { return .failure(.invalidAmount) }
         var linked: Account?
         if let uid = draft.linkedAccountUid {
             guard let found = data.accounts[uid], found.kind == .bank else { return .failure(.unknownLinkedAccount) }
@@ -76,31 +71,18 @@ public enum AccountRules {
         let kind = draft.kind
         let uid = FinanceIds.random()
         var sealed: SealedSecret?
-        if let number, let key {
-            guard let s = SecretBox.seal(number, accountUid: uid, key: key) else { return .failure(.noFinanceKey) }
-            sealed = s
+        if let number {
+            switch seal(number, uid: uid, key: key) {
+            case .failure(let error): return .failure(error)
+            case .success(let s): sealed = s
+            }
         }
-        let account = Account(
-            uid: uid,
-            kind: kind,
-            name: name,
-            institution: draft.institution?.cleaned,
-            last4: last4,
-            hasSecret: sealed != nil,
-            bankType: kind == .bank ? draft.bankType : nil,
-            ifsc: draft.ifsc?.cleaned?.uppercased(),
-            linkedAccountUid: kind == .debitCard ? linked?.uid : nil,
-            network: draft.network?.cleaned,
-            expiry: draft.expiry?.cleaned,
-            holder: draft.holder?.cleaned,
-            creditLimitMinor: kind == .creditCard ? draft.creditLimitMinor : nil,
-            statementDay: kind == .creditCard ? draft.statementDay : nil,
-            dueDay: kind == .creditCard ? draft.dueDay : nil,
-            colorToken: draft.colorToken,
-            archived: false,
-            createdAtMillis: now,
-            updatedAtMillis: now
+        var account = Account(
+            uid: uid, kind: kind, name: name, institution: nil, last4: nil, hasSecret: sealed != nil, bankType: nil, ifsc: nil,
+            linkedAccountUid: kind == .debitCard ? linked?.uid : nil, network: nil, expiry: nil, holder: nil, creditLimitMinor: nil,
+            statementDay: nil, dueDay: nil, colorToken: draft.colorToken, archived: false, createdAtMillis: now, updatedAtMillis: now
         )
+        fill(&account, from: draft, name: name, last4: last4)
         var writes: [RecordWrite] = [.account(account)]
         if let sealed { writes.append(.secret(accountUid: uid, sealed, atMillis: now)) }
         // A linked debit card has no money of its own; its bank account already has an opening entry.
@@ -120,35 +102,22 @@ public enum AccountRules {
     public static func update(_ uid: String, _ draft: AccountDraft, opening: Int64? = nil, in data: FinanceData, key: DataKey? = nil,
                               clock: FinanceClock = .system) -> Result<Change, FinanceError> {
         guard var a = data.accounts[uid] else { return .failure(.notFound) }
-        guard let name = draft.name.cleaned else { return .failure(.blankName) }
-        let number: String?
-        switch AccountNumbers.clean(draft.fullNumber) {
+        let name: String, number: String?, last4: String?
+        switch checked(draft, numberReplacesLast4: true) {
         case .failure(let error): return .failure(error)
-        case .success(let n): number = n
+        case .success(let c): (name, number, last4) = c
         }
-        let last4 = number.map { String($0.suffix(4)) } ?? draft.last4?.cleaned
-        if let last4, last4.count != 4 || !last4.allSatisfy(\.isNumber) { return .failure(.invalidLast4) }
-        if [draft.statementDay, draft.dueDay].compactMap({ $0 }).contains(where: { !(1...31).contains($0) }) { return .failure(.invalidDay) }
-        if (draft.creditLimitMinor ?? 0) < 0 { return .failure(.invalidAmount) }
-        let kind = a.kind
-        a.name = name
-        a.institution = draft.institution?.cleaned
-        a.last4 = last4
-        a.bankType = kind == .bank ? draft.bankType : nil
-        a.ifsc = draft.ifsc?.cleaned?.uppercased()
-        a.network = draft.network?.cleaned
-        a.expiry = draft.expiry?.cleaned
-        a.holder = draft.holder?.cleaned
-        a.creditLimitMinor = kind == .creditCard ? draft.creditLimitMinor : nil
-        a.statementDay = kind == .creditCard ? draft.statementDay : nil
-        a.dueDay = kind == .creditCard ? draft.dueDay : nil
+        fill(&a, from: draft, name: name, last4: last4)
         a.colorToken = draft.colorToken ?? a.colorToken
         a.updatedAtMillis = clock.nowMillis
         var writes: [RecordWrite] = []
         if let number {
-            guard let key, let sealed = SecretBox.seal(number, accountUid: uid, key: key) else { return .failure(.noFinanceKey) }
-            a.hasSecret = true
-            writes.append(.secret(accountUid: uid, sealed, atMillis: a.updatedAtMillis))
+            switch seal(number, uid: uid, key: key) {
+            case .failure(let error): return .failure(error)
+            case .success(let sealed):
+                a.hasSecret = true
+                writes.append(.secret(accountUid: uid, sealed, atMillis: a.updatedAtMillis))
+            }
         }
         if let opening {
             switch setOpening(uid, to: opening, in: data, clock: clock) {
@@ -157,6 +126,47 @@ public enum AccountRules {
             }
         }
         return .success(Change([.account(a)] + writes))
+    }
+
+    /// The checks Add and Edit share: the cleaned name, full number and last 4, then the days and limit.
+    /// On add a typed last 4 has to be the number's. On edit (`numberReplacesLast4`) the draft starts from
+    /// the saved account, so its last 4 is the old number's: a new number replaces it instead.
+    private static func checked(_ draft: AccountDraft, numberReplacesLast4: Bool) -> Result<(name: String, number: String?, last4: String?), FinanceError> {
+        guard let name = draft.name.cleaned else { return .failure(.blankName) }
+        let number: String?
+        switch AccountNumbers.clean(draft.fullNumber) {
+        case .failure(let error): return .failure(error)
+        case .success(let n): number = n
+        }
+        let typed = draft.last4?.cleaned
+        let numbers = number.map { String($0.suffix(4)) }
+        let last4 = numberReplacesLast4 ? numbers ?? typed : typed ?? numbers
+        if let last4, last4.count != 4 || !last4.allSatisfy(\.isNumber) { return .failure(.invalidLast4) }
+        if let numbers, numbers != last4 { return .failure(.invalidNumber) }
+        if [draft.statementDay, draft.dueDay].compactMap({ $0 }).contains(where: { !(1...31).contains($0) }) { return .failure(.invalidDay) }
+        if (draft.creditLimitMinor ?? 0) < 0 { return .failure(.invalidAmount) }
+        return .success((name, number, last4))
+    }
+
+    /// The draft's cleaned fields, with those only one kind has cleared on the others.
+    private static func fill(_ a: inout Account, from draft: AccountDraft, name: String, last4: String?) {
+        a.name = name
+        a.institution = draft.institution?.cleaned
+        a.last4 = last4
+        a.bankType = a.kind == .bank ? draft.bankType : nil
+        a.ifsc = draft.ifsc?.cleaned?.uppercased()
+        a.network = draft.network?.cleaned
+        a.expiry = draft.expiry?.cleaned
+        a.holder = draft.holder?.cleaned
+        a.creditLimitMinor = a.kind == .creditCard ? draft.creditLimitMinor : nil
+        a.statementDay = a.kind == .creditCard ? draft.statementDay : nil
+        a.dueDay = a.kind == .creditCard ? draft.dueDay : nil
+    }
+
+    /// Seals a full number into finSecrets, bound to its account. No key, or one that can't seal, is `noFinanceKey`.
+    private static func seal(_ number: String, uid: String, key: DataKey?) -> Result<SealedSecret, FinanceError> {
+        guard let key, let sealed = SecretBox.seal(number, accountUid: uid, key: key) else { return .failure(.noFinanceKey) }
+        return .success(sealed)
     }
 
     /// The balance an account started with (a credit card's, what it owed): its opening entries, together.
