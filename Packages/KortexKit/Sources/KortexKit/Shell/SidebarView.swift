@@ -209,7 +209,6 @@ struct SidebarView: View {
         Task {
             do {
                 try await finance.eraseAll()
-                ReceiptStore.removeAll()
             } catch {
                 resetError = error.localizedDescription
             }

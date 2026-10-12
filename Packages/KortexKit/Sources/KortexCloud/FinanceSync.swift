@@ -20,6 +20,8 @@ public final class FinanceSync: FinanceStore {
     @ObservationIgnored private var retries: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var userUid: String?
     @ObservationIgnored private var health = SyncHealth(collections: FinanceSync.collections)
+    /// The signed-in user's receipt images on this Mac.
+    @ObservationIgnored public private(set) var receipts: any ReceiptFiles = ReceiptFolder(userUid: nil)
 
     private static let collections = ["finCategories", "finAccounts", "finStatements", "finRecurring", "finMerchants", "finTransactions"]
 
@@ -29,6 +31,7 @@ public final class FinanceSync: FinanceStore {
         guard uid != userUid else { return }
         stop()
         userUid = uid
+        receipts = ReceiptFolder(userUid: uid)
         status = .loading
         for name in Self.collections {
             listen(to: name, uid: uid)
@@ -78,6 +81,7 @@ public final class FinanceSync: FinanceStore {
         case .failure(let error):
             return error
         case .success(let change):
+            receipts.remove(data.receiptPathsDropped(by: change))
             write(change)
             return nil
         }
@@ -120,6 +124,7 @@ public final class FinanceSync: FinanceStore {
 
     /// Reset data: marks every finance document deleted, finSecrets and finBudgets included (which
     /// aren't listened to), so the phone erases them too on its next sync. Reads from the server when it can be reached.
+    /// This user's receipt images go too, including those earlier builds kept outside their folder.
     public func eraseAll() async throws {
         guard let uid = userUid else { return }
         let user = Firestore.firestore().collection("users").document(uid)
@@ -132,6 +137,8 @@ public final class FinanceSync: FinanceStore {
         }
         guard userUid == uid else { return }
         write(ResetRules.eraseAll(live))
+        receipts.remove(data.transactions.values.compactMap { $0.receipt?.photoDevicePath })
+        receipts.removeAll()
     }
 
     public func stop() {
@@ -140,6 +147,7 @@ public final class FinanceSync: FinanceStore {
         listeners.values.forEach { $0.remove() }
         listeners = [:]
         userUid = nil
+        receipts = ReceiptFolder(userUid: nil)
         health = SyncHealth(collections: Self.collections)
         data = FinanceData()
         status = .idle

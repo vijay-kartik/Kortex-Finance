@@ -29,8 +29,26 @@ public protocol FinanceStore: AnyObject, Observable {
     func dataKey() async throws -> DataKey
     /// An account's full number, opened. Nil when none is kept.
     func revealNumber(of accountUid: String) async throws -> String?
-    /// Reset data: every finance record deleted, built-in categories aside.
+    /// Reset data: every finance record deleted, built-in categories aside, and the receipt images.
     func eraseAll() async throws
+    /// The signed-in user's receipt images. Writes go through `apply(keeping:for:_:)`; an entry's
+    /// image goes when a committed change deletes the entry or replaces its receipt.
+    var receipts: any ReceiptFiles { get }
+}
+
+extension FinanceStore {
+    /// A change that keeps a receipt image with entry `entryUid`. `rules` is given where the image
+    /// will be kept (nil when it isn't), and the image is copied there only once they've accepted the
+    /// change, so a refused save leaves nothing behind. When it can't be copied, the change is made
+    /// without it.
+    @discardableResult
+    public func apply(keeping image: URL?, for entryUid: String, _ rules: (ReceiptImage?) -> Result<Change, FinanceError>) -> FinanceError? {
+        guard let image, let place = receipts.place(image, for: entryUid) else { return apply(rules(nil)) }
+        let result = rules(place)
+        guard case .success = result else { return apply(result) }
+        do { try receipts.keep(image, at: place) } catch { return apply(rules(nil)) }
+        return apply(result)
+    }
 }
 
 /// A `FinanceStore` in memory: changes land in `data` straight away, as the listeners would bring
@@ -43,12 +61,14 @@ public final class PreviewFinanceStore: FinanceStore {
     public var writeError: String?
     /// Every change applied, oldest first.
     public private(set) var changes: [Change] = []
+    @ObservationIgnored public let receipts: any ReceiptFiles
 
     @ObservationIgnored private let key: DataKey
     @ObservationIgnored private var secrets: [String: SealedSecret] = [:]
 
-    public init(_ data: FinanceData = FinanceData()) {
+    public init(_ data: FinanceData = FinanceData(), receipts: any ReceiptFiles = MemoryReceiptFiles()) {
         self.data = data
+        self.receipts = receipts
         key = DataKey(userUid: "preview", bytes: Data(repeating: 7, count: 32), version: 1)!
     }
 
@@ -59,6 +79,7 @@ public final class PreviewFinanceStore: FinanceStore {
             return error
         case .success(let change):
             changes.append(change)
+            receipts.remove(data.receiptPathsDropped(by: change))
             data.apply(change)
             for write in change.writes {
                 if case .secret(let uid, let sealed, _) = write { secrets[uid] = sealed }
@@ -77,6 +98,7 @@ public final class PreviewFinanceStore: FinanceStore {
     public func eraseAll() async throws {
         data = FinanceData()
         secrets = [:]
+        receipts.removeAll()
     }
 
     /// A bank account with a few entries this month, added through the write rules.

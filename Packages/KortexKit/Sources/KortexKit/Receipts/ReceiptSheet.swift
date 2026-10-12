@@ -268,27 +268,49 @@ struct ReceiptSheet: View {
                                          in: finance.data, clock: .system)
     }
 
-    private func receiptRecord(for uid: String) -> Receipt {
-        let kept = keepImage ? ReceiptStore.keep(file, as: uid) : nil
-        return Receipt(itemCount: receipt.items.reduce(0) { $0 + $1.quantity }, items: receipt.items, taxMinor: receipt.taxMinor,
-                       photoDevicePath: kept?.path, photoMimeType: kept?.mime)
-    }
-
     private func save() {
         guard let minor = Money.parseMinor(amount), minor > 0 else { error = FinanceError.invalidAmount.message; return }
         guard !accountUid.isEmpty else { error = "Pick how you paid."; return }
-        let uid = FinanceIds.random()
         let draft = TransactionDraft(type: .expense, amountMinor: minor, accountUid: accountUid, categoryUid: categoryUid,
-                                     merchant: merchant, note: note, occurredAtMillis: occurredAt, source: .receipt,
-                                     receipt: receiptRecord(for: uid), uid: uid)
-        if let failure = finance.apply(EntryRules.add(draft, in: finance.data)) { error = failure.message } else { close() }
-    }
-
-    private func attach(to existing: Entry) {
-        if let failure = finance.apply(EntryRules.attachReceipt(receiptRecord(for: existing.uid), to: existing.uid, in: finance.data)) {
+                                     merchant: merchant, note: note, occurredAtMillis: occurredAt, source: .receipt)
+        if let failure = ReceiptSaving.add(draft, from: receipt, image: keepImage ? file : nil, finance: finance) {
             error = failure.message
         } else {
             close()
         }
+    }
+
+    private func attach(to existing: Entry) {
+        if let failure = ReceiptSaving.attach(receipt, image: keepImage ? file : nil, to: existing.uid, finance: finance) {
+            error = failure.message
+        } else {
+            close()
+        }
+    }
+}
+
+/// What Save expense and Attach receipt write. The image is kept through the store, only once the
+/// rules have accepted the entry.
+@MainActor
+enum ReceiptSaving {
+    static func add(_ draft: TransactionDraft, from receipt: ParsedReceipt, image: URL?, finance: any FinanceStore) -> FinanceError? {
+        let uid = draft.uid ?? FinanceIds.random()
+        return finance.apply(keeping: image, for: uid) { kept in
+            var draft = draft
+            draft.uid = uid
+            draft.receipt = record(receipt, kept)
+            return EntryRules.add(draft, in: finance.data)
+        }
+    }
+
+    static func attach(_ receipt: ParsedReceipt, image: URL?, to uid: String, finance: any FinanceStore) -> FinanceError? {
+        finance.apply(keeping: image, for: uid) { kept in
+            EntryRules.attachReceipt(record(receipt, kept), to: uid, in: finance.data)
+        }
+    }
+
+    private static func record(_ receipt: ParsedReceipt, _ kept: ReceiptImage?) -> Receipt {
+        Receipt(itemCount: receipt.items.reduce(0) { $0 + $1.quantity }, items: receipt.items, taxMinor: receipt.taxMinor,
+                photoDevicePath: kept?.path, photoMimeType: kept?.mimeType)
     }
 }

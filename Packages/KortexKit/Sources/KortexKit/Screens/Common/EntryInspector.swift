@@ -7,6 +7,7 @@ import SwiftUI
 struct EntryInspector: View {
     let entry: Entry?
     let data: FinanceData
+    let receipts: any ReceiptFiles
     var onEdit: ((Entry) -> Void)?
     var onDelete: ((Entry) -> Void)?
 
@@ -120,7 +121,7 @@ struct EntryInspector: View {
                 }
             }
             if let path = r.photoDevicePath {
-                if FileManager.default.fileExists(atPath: path) {
+                if receipts.exists(path) {
                     Button { NSWorkspace.shared.open(URL(fileURLWithPath: path)) } label: { Label("Open receipt image", systemImage: "doc.text.image") }
                         .buttonStyle(.link)
                 } else {
