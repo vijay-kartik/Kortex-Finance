@@ -17,6 +17,8 @@ struct AccountSheet: View {
     /// As typed: the full number, or just the last 4. Empty on edit keeps what's saved.
     @State private var number = ""
     @State private var saving = false
+    /// The save waiting on the data key; cancelled when the sheet goes, so it can't write after.
+    @State private var saveTask: Task<Void, Never>?
     @State private var revealed: String?
     @State private var revealing = false
 
@@ -37,7 +39,7 @@ struct AccountSheet: View {
             title: editing == nil ? "Add account" : "Edit \(editing!.name)",
             primary: saving ? "Saving…" : editing == nil ? "Add" : "Save changes",
             error: error,
-            onCancel: close,
+            onCancel: { saveTask?.cancel(); close() },
             onPrimary: save
         ) {
             if editing == nil {
@@ -101,6 +103,7 @@ struct AccountSheet: View {
                 }
             }
         }
+        .onDisappear { saveTask?.cancel() }
     }
 
     @ViewBuilder private var numberField: some View {
@@ -175,11 +178,15 @@ struct AccountSheet: View {
         if case .failure(let failure) = AccountNumbers.clean(d.fullNumber) { error = failure.message; return }
         saving = true
         error = nil
-        Task {
+        saveTask = Task {
             defer { saving = false }
             do {
-                commit(d, key: try await finance.dataKey())
+                let key = try await finance.dataKey()
+                // Cancelled while waiting on the key: the sheet is gone, so nothing is written.
+                guard !Task.isCancelled else { return }
+                commit(d, key: key)
             } catch {
+                guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
             }
         }

@@ -27,6 +27,12 @@ public final class AppModel {
 
     public init() {}
 
+    /// Closes `sheet` if it's still the one showing, so a late close from a sheet that's already
+    /// gone can't dismiss the one opened since.
+    public func dismiss(_ sheet: Sheet) {
+        if self.sheet == sheet { self.sheet = nil }
+    }
+
     /// File › Scan Receipt…: pick a photo or PDF in the open panel.
     public func chooseReceipt() {
         let panel = NSOpenPanel()

@@ -28,7 +28,7 @@ public struct RootView: View {
                         .toolbarBackground(.visible, for: .windowToolbar)
                 }
                 .sheet(item: $model.sheet) { sheet in
-                    SheetHost(sheet: sheet, finance: session.finance, model: model, close: { model.sheet = nil })
+                    SheetHost(sheet: sheet, finance: session.finance, model: model, close: { model.dismiss(sheet) })
                 }
                 .modifier(ReceiptDropTarget(model: model))
             }
