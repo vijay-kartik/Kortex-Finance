@@ -16,7 +16,7 @@ struct RecurringSheet: View {
         self.finance = finance
         self.editing = editing
         self.close = close
-        let firstAccount = finance.data.accounts.values.filter { !$0.archived }.min { $0.createdAtMillis < $1.createdAtMillis }
+        let firstAccount = finance.data.activeAccounts.first
         let start = editing.map(RecurringDraft.init) ?? RecurringDraft(
             name: "", kind: .subscription, amountMinor: 0, frequency: .monthly,
             nextDueOn: LocalDay.today(), accountUid: firstAccount?.uid ?? "", remindDaysBefore: 2
@@ -28,7 +28,7 @@ struct RecurringSheet: View {
 
     var body: some View {
         let data = finance.data
-        let accounts = data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let accounts = data.activeAccounts
         let categories = data.categories.values.filter { $0.kind == .expense }
             .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder) < ($1.builtIn ? 0 : 1, $1.sortOrder) }
         SheetChrome(

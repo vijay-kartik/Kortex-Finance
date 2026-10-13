@@ -39,7 +39,7 @@ struct StatementRowsTable: View {
         let isCard = draft.account.kind == .creditCard
         let rows = draft.rows.filter(filter.admits)
         let categories = Dictionary(grouping: data.categories.values.sorted { $0.name < $1.name }, by: \.kind)
-        let payFrom = data.accounts.values.filter { !$0.archived && !$0.kind.isCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let payFrom = data.moneyAccounts
         let cards = data.accounts.values.filter { !$0.archived && $0.kind == .creditCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let mine = StatementImportRules.transferAccounts(into: draft.existingAccountUid, in: data)
         let payments = data.recurring.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -104,7 +104,7 @@ struct StatementRowsTable: View {
                 } else if row.kind == .cardPayment && !isCard {
                     Picker("", selection: otherAccountBinding(row, \.cardUid)) {
                         Text("Choose card…").tag(String?.none)
-                        ForEach(cards) { c in Text(c.last4.map { "\(c.name) ••\($0)" } ?? c.name).tag(String?.some(c.uid)) }
+                        ForEach(cards) { c in Text(c.label).tag(String?.some(c.uid)) }
                     }
                     .labelsHidden().pickerStyle(.menu).controlSize(.small)
                 } else if row.kind == .cardCredit {

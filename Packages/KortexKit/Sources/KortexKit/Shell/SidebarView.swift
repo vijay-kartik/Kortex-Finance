@@ -110,7 +110,7 @@ struct SidebarView: View {
     private func ledgerRow(_ account: Account, data: FinanceData) -> some View {
         HStack(spacing: 8) {
             Label {
-                Text(account.kind.isCard ? cardTitle(account) : account.name)
+                Text(account.kind.isCard ? account.label : account.name)
                     .font(.grotesk(13))
                     .lineLimit(1)
             } icon: {
@@ -214,10 +214,6 @@ struct SidebarView: View {
             }
             resetting = false
         }
-    }
-
-    private func cardTitle(_ card: Account) -> String {
-        card.last4.map { "\(card.name) ••\($0)" } ?? card.name
     }
 
     private func symbol(for kind: AccountKind) -> String {

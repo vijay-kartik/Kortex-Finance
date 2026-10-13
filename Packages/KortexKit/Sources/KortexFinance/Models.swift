@@ -84,6 +84,9 @@ public struct Account: Sendable, Hashable, Identifiable {
     public var updatedAtMillis: Int64
 
     public var id: String { uid }
+
+    /// How pickers, lists and messages name it: "HDFC Checking ••4471", or just the name.
+    public var label: String { last4.map { "\(name) ••\($0)" } ?? name }
 }
 
 public struct ReceiptItem: Sendable, Hashable {

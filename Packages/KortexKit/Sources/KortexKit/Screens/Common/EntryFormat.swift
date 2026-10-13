@@ -25,7 +25,7 @@ enum EntryFormat {
         if uid == FinanceIds.unknownAccount { return "Unknown account" }
         if uid == FinanceIds.cardCredit { return "Refund / credit" }
         guard let a = data.accounts[uid] else { return "Deleted account" }
-        return a.last4.map { "\(a.name) ••\($0)" } ?? a.name
+        return a.label
     }
 
     static func categoryName(_ uid: String?, _ data: FinanceData) -> String? {

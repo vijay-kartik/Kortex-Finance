@@ -36,7 +36,7 @@ struct EntrySheet: View {
         self.finance = finance
         self.editing = editing
         self.close = close
-        let accounts = finance.data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let accounts = finance.data.activeAccounts
         _type = State(initialValue: editing?.type ?? type)
         _amount = State(initialValue: editing.map { Money.editable($0.amountMinor) } ?? "")
         _date = State(initialValue: editing.map { Date(timeIntervalSince1970: TimeInterval($0.occurredAtMillis) / 1000) } ?? Date())
@@ -103,7 +103,7 @@ struct EntrySheet: View {
 
     var body: some View {
         let data = finance.data
-        let all = data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let all = data.activeAccounts
         let fromAccounts = type == .expense ? all : all.filter { $0.kind != .creditCard }
         let categoryKind: CategoryKind = type == .income ? .income : .expense
         let categories = data.categories.values.filter { $0.kind == categoryKind }
