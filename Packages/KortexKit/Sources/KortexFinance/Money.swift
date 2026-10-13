@@ -3,19 +3,23 @@ import Foundation
 /// Amounts are kept in minor units (paise for INR), as on Android.
 public enum Money {
     /// What someone typed in an amount field: "1,234.5", "₹ 42", "42.50" → paise. Nil when it isn't
-    /// an amount, or has more than two decimals.
+    /// an amount (only ASCII digits count), has more than two decimals, or is too big for paise.
     public static func parseMinor(_ text: String) -> Int64? {
         let clean = text.filter { !$0.isWhitespace && $0 != "," && $0 != "₹" }
-        guard !clean.isEmpty, clean.allSatisfy({ $0.isNumber || $0 == "." }), clean.filter({ $0 == "." }).count <= 1 else { return nil }
+        guard !clean.isEmpty, clean.allSatisfy({ ($0.isASCII && $0.isNumber) || $0 == "." }), clean.filter({ $0 == "." }).count <= 1 else { return nil }
         let parts = clean.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.contains(where: { !$0.isEmpty }) else { return nil }
         guard let whole = Int64(parts[0].isEmpty ? "0" : String(parts[0])) else { return nil }
         var fraction: Int64 = 0
         if parts.count == 2 {
             let digits = parts[1]
             guard digits.count <= 2 else { return nil }
-            fraction = Int64(digits.padding(toLength: 2, withPad: "0", startingAt: 0)) ?? 0
+            guard let parsed = Int64(digits.padding(toLength: 2, withPad: "0", startingAt: 0)) else { return nil }
+            fraction = parsed
         }
-        return whole * 100 + fraction
+        let (paise, overflowed) = whole.multipliedReportingOverflow(by: 100)
+        let (total, overflowedAdding) = paise.addingReportingOverflow(fraction)
+        return overflowed || overflowedAdding ? nil : total
     }
 
     /// Paise as an editable amount: "42.50", "1245" (no symbol or grouping).
