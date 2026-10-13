@@ -91,6 +91,12 @@ enum EntryFormat {
         }
     }
 
+    /// "12 entries", or while searching "3 of 12 entries".
+    static func count(_ shown: Int, of total: Int, searching: Bool) -> String {
+        if searching { return "\(shown) of \(total == 1 ? "1 entry" : "\(total) entries")" }
+        return total == 1 ? "1 entry" : "\(total) entries"
+    }
+
     /// "Mon, 28 Sep 2026 · 6:42 PM".
     static func when(_ tx: Entry) -> String {
         let day = tx.occurredOn.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
@@ -111,6 +117,18 @@ struct SourceChip: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Color.kRaised, in: RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// In place of an entries table when the search finds nothing in it.
+struct NoSearchMatches: View {
+    let search: EntrySearch
+
+    var body: some View {
+        Text("No entries match “\(search.text)”.")
+            .font(.grotesk(13)).foregroundStyle(Color.kMuted)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minHeight: 80)
     }
 }
 

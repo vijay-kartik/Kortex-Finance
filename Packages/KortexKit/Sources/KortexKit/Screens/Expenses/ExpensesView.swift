@@ -22,8 +22,12 @@ struct ExpensesView: View {
         let today = LocalDay.today()
         let period = model.expensesPeriod
         let range = period.range
-        let inPeriod = data.transactions.values.filter { $0.type != .opening && $0.occurredOn.isWithin(range.from, range.to) }
-        let shown = inPeriod.filter {
+        // The period's entries, or while searching, the matches from every period.
+        let search = EntrySearch(model.entrySearch)
+        let listed = data.transactions.values.filter {
+            $0.type != .opening && (search.isEmpty ? $0.occurredOn.isWithin(range.from, range.to) : search.matches($0, data: data))
+        }
+        let shown = listed.filter {
             switch filter {
             case .all: true
             case .expenses: $0.type == .expense
@@ -32,14 +36,18 @@ struct ExpensesView: View {
         }
 
         VStack(alignment: .leading, spacing: 16) {
-            ExpensesSummary(data: data, period: period, today: today, go: go)
-                .fixedSize(horizontal: false, vertical: true)
+            if search.isEmpty {
+                ExpensesSummary(data: data, period: period, today: today, go: go)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                searchSummary(listed)
+            }
             VStack(spacing: 0) {
-                PanelHeader(title: "Entries") {
+                PanelHeader(title: search.isEmpty ? "Entries" : "Search results") {
                     KSegmented("Show", selection: $filter, options: Filter.allCases.map { ($0, $0.rawValue) })
                 }
                 if shown.isEmpty {
-                    Text(inPeriod.isEmpty ? "Nothing added in this period." : "No \(filter.rawValue.lowercased()) in this period.")
+                    Text(emptyText(search, nothingAtAll: listed.isEmpty))
                         .font(.grotesk(13)).foregroundStyle(Color.kMuted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -59,8 +67,10 @@ struct ExpensesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.kVoid)
         .navigationTitle("Expenses")
-        .navigationSubtitle(inPeriod.count == 1 ? "1 entry" : "\(inPeriod.count) entries")
+        .navigationSubtitle(search.isEmpty ? (listed.count == 1 ? "1 entry" : "\(listed.count) entries")
+                                           : (listed.count == 1 ? "1 result" : "\(listed.count) results"))
         .toolbar { toolbar(today: today) }
+        .searchable(text: $model.entrySearch, placement: .toolbar, prompt: "Search entries")
         .sidePanel(isPresented: showsInspector) {
             ExpensesInspector(model: model, data: data, receipts: finance.receipts, onDelete: { deleting = [$0] })
         }
@@ -111,9 +121,34 @@ struct ExpensesView: View {
         }
     }
 
+    private func emptyText(_ search: EntrySearch, nothingAtAll: Bool) -> String {
+        switch (search.isEmpty, nothingAtAll) {
+        case (false, true): "No entries match “\(search.text)”."
+        case (false, false): "No \(filter.rawValue.lowercased()) match “\(search.text)”."
+        case (true, true): "Nothing added in this period."
+        case (true, false): "No \(filter.rawValue.lowercased()) in this period."
+        }
+    }
+
+    /// In place of the period's summary while searching: "12 results · Out ₹4,210 · In ₹0".
+    private func searchSummary(_ results: [Entry]) -> some View {
+        let (out, inn) = totals(results)
+        return HStack(spacing: 8) {
+            Text(results.count == 1 ? "1 result" : "\(results.count) results").font(.grotesk(13, .medium)).foregroundStyle(Color.kInk)
+            Text("·").foregroundStyle(Color.kMuted)
+            Text("Out \(Money.format(out))").font(.mono(13)).foregroundStyle(Color.kMuted)
+            Text("·").foregroundStyle(Color.kMuted)
+            Text("In \(Money.format(inn))").font(.mono(13)).foregroundStyle(Color.kGrowth)
+        }
+    }
+
+    private func totals(_ entries: [Entry]) -> (out: Int64, in: Int64) {
+        (entries.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor },
+         entries.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor })
+    }
+
     private func footer(_ shown: [Entry]) -> some View {
-        let out = shown.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        let inn = shown.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
+        let (out, inn) = totals(shown)
         return HStack(spacing: 16) {
             Text(shown.count == 1 ? "1 entry" : "\(shown.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             Spacer()

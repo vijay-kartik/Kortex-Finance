@@ -18,6 +18,13 @@ struct AppModelTests {
         #expect(model.sheet == .newEntry(.expense))
     }
 
+    @Test func signingOutClearsTheSearch() {
+        let model = AppModel()
+        model.entrySearch = "swiggy"
+        model.signingOut()
+        #expect(model.entrySearch.isEmpty)
+    }
+
     @Test func dismissWithNothingShowingStaysClosed() {
         let model = AppModel()
         model.dismiss(.recurring(nil))

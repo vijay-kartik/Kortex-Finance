@@ -11,6 +11,9 @@ public final class AppModel {
     public var destination: Destination = .dashboard
     /// Which day, month or year Expenses shows, kept while switching screens.
     public var expensesPeriod = ExpensesPeriod.startingAt(.today())
+    /// The search field on Expenses, Accounts and Cards, kept while switching screens. While it isn't
+    /// blank, Expenses lists matches from every period instead of the selected one.
+    public var entrySearch = ""
     /// The selected entries on Expenses and Accounts. One alone is shown in the inspector.
     public var selectedEntryUids: Set<String> = []
     /// Nil shows the first account / card.
@@ -31,6 +34,11 @@ public final class AppModel {
     /// gone can't dismiss the one opened since.
     public func dismiss(_ sheet: Sheet) {
         if self.sheet == sheet { self.sheet = nil }
+    }
+
+    /// Before signing out: the next person to sign in shouldn't find the last one's search.
+    public func signingOut() {
+        entrySearch = ""
     }
 
     /// File › Scan Receipt…: pick a photo or PDF in the open panel.

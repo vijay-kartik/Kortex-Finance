@@ -20,7 +20,10 @@ public struct RootView: View {
                 SignInView(session: session)
             case .signedIn(let user):
                 NavigationSplitView {
-                    SidebarView(selection: $model.destination, finance: session.finance, user: user, open: model.open, signOut: session.signOut)
+                    SidebarView(selection: $model.destination, finance: session.finance, user: user, open: model.open, signOut: {
+                        model.signingOut()
+                        session.signOut()
+                    })
                         .navigationSplitViewColumnWidth(min: 220, ideal: 232, max: 280)
                 } detail: {
                     detail
