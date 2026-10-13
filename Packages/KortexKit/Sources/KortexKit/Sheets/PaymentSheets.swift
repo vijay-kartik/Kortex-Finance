@@ -20,9 +20,7 @@ struct PayBillSheet: View {
         self.finance = finance
         self.statementUid = statementUid
         self.close = close
-        let banks = finance.data.accounts.values.filter { !$0.archived && $0.kind != .creditCard && !$0.kind.isCard }
-            .sorted { $0.createdAtMillis < $1.createdAtMillis }
-        _fromUid = State(initialValue: banks.first?.uid ?? "")
+        _fromUid = State(initialValue: finance.data.moneyAccounts.first?.uid ?? "")
     }
 
     var body: some View {
@@ -32,11 +30,11 @@ struct PayBillSheet: View {
         let unpaid = statement.map { Statements.unpaidMinor($0, txs) } ?? 0
         let minimum = statement.map { max($0.minDueMinor - Statements.paidMinor($0, txs), 0) } ?? 0
         let card = statement.flatMap { data.accounts[$0.cardUid] }
-        let from = data.accounts.values.filter { !$0.archived && !$0.kind.isCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let from = data.moneyAccounts
 
         SheetChrome(
             title: "Pay card bill",
-            subtitle: card.map { c in "\(c.last4.map { "\(c.name) ••\($0)" } ?? c.name) · due \(statement.map { Format.dueDay($0.dueOn) } ?? "")" },
+            subtitle: card.map { c in "\(c.label) · due \(statement.map { Format.dueDay($0.dueOn) } ?? "")" },
             primary: "Record payment",
             error: error,
             onCancel: close,
@@ -98,7 +96,7 @@ struct MarkPaidSheet: View {
     var body: some View {
         let data = finance.data
         let r = data.recurring[recurringUid]
-        let accounts = data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let accounts = data.activeAccounts
         SheetChrome(
             title: "Mark \(r?.name ?? "payment") as paid",
             subtitle: "Due \(Format.dueDay(dueOn))",

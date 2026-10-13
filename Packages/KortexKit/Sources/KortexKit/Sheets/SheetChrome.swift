@@ -79,7 +79,7 @@ struct AccountPicker: View {
         Picker(label, selection: $selection) {
             if !accounts.contains(where: { $0.uid == selection }) { Text("Choose…").tag("") }
             ForEach(accounts) { a in
-                Text(a.last4.map { "\(a.name) ••\($0)" } ?? a.name).tag(a.uid)
+                Text(a.label).tag(a.uid)
             }
         }
     }

@@ -201,7 +201,7 @@ struct PendingView: View {
         let urgency = Pending.urgency(item.dueOn, today: today)
         let recurring = data.recurring[item.sourceUid]
         let card = item.kind == .cardBill ? data.accounts[item.title] : nil
-        let title = card.map { c in c.last4.map { "\(c.name) ••\($0)" } ?? c.name } ?? item.title
+        let title = card?.label ?? item.title
         let subtitle: String = switch item.kind {
         case .cardBill: item.minDueMinor.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
         case .subscription: "Subscription · \(recurring.map(RecurringSchedule.frequencyLabel) ?? "")"

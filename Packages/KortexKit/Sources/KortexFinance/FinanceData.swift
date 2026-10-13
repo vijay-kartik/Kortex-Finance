@@ -72,14 +72,15 @@ public struct FinanceData: Sendable {
 
     // MARK: Derived
 
-    /// Accounts that aren't cards, newest last like the phone's list.
-    public var moneyAccounts: [Account] {
-        accounts.values.filter { !$0.kind.isCard && !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+    /// Every account and card that isn't archived, newest last like the phone's list.
+    public var activeAccounts: [Account] {
+        accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
     }
 
-    public var cards: [Account] {
-        accounts.values.filter { $0.kind.isCard && !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
-    }
+    /// Accounts that aren't cards, newest last like the phone's list.
+    public var moneyAccounts: [Account] { activeAccounts.filter { !$0.kind.isCard } }
+
+    public var cards: [Account] { activeAccounts.filter { $0.kind.isCard } }
 
     /// What's owed on all your credit cards that aren't archived. Debit cards owe nothing: their
     /// balance is their bank account's.

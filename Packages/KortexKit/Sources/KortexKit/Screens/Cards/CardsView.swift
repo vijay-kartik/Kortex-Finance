@@ -44,7 +44,7 @@ struct CardsView: View {
             if cards.count > 1 {
                 ToolbarItem(placement: .principal) {
                     KSegmented("Card", selection: Binding(get: { selected?.uid ?? "" }, set: { model.selectedCardUid = $0 }),
-                               options: cards.map { card in (card.uid, card.last4.map { "\(card.name) ••\($0)" } ?? card.name) })
+                               options: cards.map { card in (card.uid, card.label) })
                 }
             }
         }

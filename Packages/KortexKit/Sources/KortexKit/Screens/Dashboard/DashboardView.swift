@@ -228,7 +228,7 @@ struct PendingCard: View {
 
     private func title(_ item: PendingItem) -> String {
         guard item.kind == .cardBill, let card = data.accounts[item.title] else { return item.title }
-        return card.last4.map { "\(card.name) ••\($0)" } ?? card.name
+        return card.label
     }
 
     private func subtitle(_ item: PendingItem) -> String {
@@ -385,7 +385,7 @@ struct RecentCard: View {
 
     private func subtitle(_ tx: KortexFinance.Transaction) -> String {
         let category = tx.categoryUid.flatMap { data.categories[$0]?.name }
-        let account = data.accounts[tx.accountUid].map { a in a.last4.map { "\(a.name) ••\($0)" } ?? a.name }
+        let account = data.accounts[tx.accountUid]?.label
         return [category, account].compactMap { $0 }.joined(separator: " · ")
     }
 }

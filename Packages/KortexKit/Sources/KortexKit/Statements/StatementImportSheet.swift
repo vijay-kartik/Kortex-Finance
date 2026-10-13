@@ -225,7 +225,7 @@ struct StatementImportSheet: View {
                 Text(isCard ? "A new credit card" : "A new bank account").tag(String?.none)
                 if !choices.isEmpty {
                     Divider()
-                    ForEach(choices) { a in Text(a.last4.map { "\(a.name) ••\($0)" } ?? a.name).tag(String?.some(a.uid)) }
+                    ForEach(choices) { a in Text(a.label).tag(String?.some(a.uid)) }
                 }
             }
             .labelsHidden()

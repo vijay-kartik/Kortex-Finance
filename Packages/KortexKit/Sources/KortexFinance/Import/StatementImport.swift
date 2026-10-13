@@ -607,7 +607,7 @@ public enum StatementImportRules {
             }
             rows[i].cardUid = cardUid
             rows[i].replaces = tx.uid
-            let card = data.accounts[cardUid].map { c in c.last4.map { "\(c.name) ••\($0)" } ?? c.name } ?? "The card"
+            let card = data.accounts[cardUid]?.label ?? "The card"
             let day = tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
             rows[i].issue = tx.accountUid == FinanceIds.unknownAccount
                 ? "\(card) has a bill payment of this amount on \(day) from an unknown account: this is it. Saving records it as paid from this account."
@@ -660,7 +660,7 @@ public enum StatementImportRules {
 
     /// Your accounts a transfer can be with: banks, cash and wallets, other than this statement's.
     public static func transferAccounts(into existingUid: String?, in data: FinanceData) -> [Account] {
-        data.accounts.values.filter { !$0.archived && !$0.kind.isCard && $0.uid != existingUid }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        data.moneyAccounts.filter { $0.uid != existingUid }
     }
 
     /// Turns money out and in between this account and another of yours into transfers, when the other
