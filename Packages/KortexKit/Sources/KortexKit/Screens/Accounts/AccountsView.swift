@@ -20,7 +20,7 @@ struct AccountsView: View {
                 .frame(width: 360)
             Rectangle().fill(Color.kEdge).frame(width: 1)
             if let selected {
-                AccountDetail(account: selected, data: data, selectedEntry: $model.selectedEntryUids,
+                AccountDetail(account: selected, data: data, search: EntrySearch(model.entrySearch), selectedEntry: $model.selectedEntryUids,
                               onEntryAction: { EntryActions.perform($0, on: $1, finance: finance, model: model, deleting: $deletingEntries) },
                               onImport: { model.chooseStatement(into: $0.uid) },
                               onEdit: { model.sheet = .account($0.uid, $0.kind) }, onDelete: { deleting = $0 })
@@ -33,6 +33,7 @@ struct AccountsView: View {
         .background(Color.kVoid)
         .navigationTitle("Accounts")
         .navigationSubtitle(accounts.count == 1 ? "1 account" : "\(accounts.count) accounts")
+        .searchable(text: $model.entrySearch, placement: .toolbar, prompt: "Search entries")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -110,6 +111,8 @@ struct AccountCard: View {
 struct AccountDetail: View {
     let account: Account
     let data: FinanceData
+    /// Narrows the entries table; the balance and figures above it stay the whole account's.
+    var search = EntrySearch("")
     @Binding var selectedEntry: Set<String>
     var onEntryAction: ((EntryAction, Set<String>) -> Void)?
     /// Import statement…: add a statement's entries, leaving out those already here.
@@ -121,6 +124,7 @@ struct AccountDetail: View {
     var body: some View {
         let today = LocalDay.today()
         let entries = data.ledgerEntries(of: account)
+        let listed = search.isEmpty ? entries : entries.filter { search.matches($0, data: data) }
         let month = today.yearMonth
         let flow = Balances.flow(of: account, transactions: entries, accounts: data.accounts, from: month.firstDay, to: today)
         let lastFlow = Balances.flow(of: account, transactions: entries, accounts: data.accounts,
@@ -177,9 +181,13 @@ struct AccountDetail: View {
             .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
                 PanelHeader(title: "Entries in this account") {
-                    Text(entries.count == 1 ? "1 entry" : "\(entries.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                    Text(EntryFormat.count(listed.count, of: entries.count, searching: !search.isEmpty)).font(.grotesk(12)).foregroundStyle(Color.kMuted)
                 }
-                EntriesTable(entries: entries, data: data, selection: $selectedEntry, onAction: onEntryAction)
+                if listed.isEmpty && !search.isEmpty {
+                    NoSearchMatches(search: search)
+                } else {
+                    EntriesTable(entries: listed, data: data, selection: $selectedEntry, onAction: onEntryAction)
+                }
             }
             .panelSurface(clipped: true)
             .frame(minHeight: 220)

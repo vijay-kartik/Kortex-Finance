@@ -18,7 +18,7 @@ struct CardsView: View {
         Group {
             if let card = selected {
                 ScrollView {
-                    CardDetail(card: card, data: data, selectedEntries: $model.selectedEntryUids,
+                    CardDetail(card: card, data: data, search: EntrySearch(model.entrySearch), selectedEntries: $model.selectedEntryUids,
                                onEntryAction: { EntryActions.perform($0, on: $1, finance: finance, model: model, deleting: $deletingEntries) },
                                onPayBill: { model.sheet = .payBill(statementUid: $0) },
                                onImport: { model.chooseStatement(into: card.uid) },
@@ -35,6 +35,7 @@ struct CardsView: View {
         .background(Color.kVoid)
         .navigationTitle(cards.count == 1 || cards.isEmpty ? "Cards" : "Cards")
         .navigationSubtitle(cards.count == 1 ? "1 card" : "\(cards.count) cards")
+        .searchable(text: $model.entrySearch, placement: .toolbar, prompt: "Search entries")
         .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance) { model.selectedCardUid = nil })
         .modifier(DeleteEntriesConfirmation(deleting: $deletingEntries, finance: finance, model: model))
         .toolbar {
@@ -54,6 +55,8 @@ struct CardsView: View {
 struct CardDetail: View {
     let card: Account
     let data: FinanceData
+    /// Narrows the entries table; the bill and figures above it stay the whole card's.
+    var search = EntrySearch("")
     @Binding var selectedEntries: Set<String>
     var onEntryAction: ((EntryAction, Set<String>) -> Void)?
     var onPayBill: ((String) -> Void)?
@@ -91,17 +94,20 @@ struct CardDetail: View {
         let list = card.kind == .creditCard
             ? txs.filter { Balances.touches($0, card, accounts: data.accounts) }
             : txs.filter { $0.accountUid == card.uid || $0.toAccountUid == card.uid }
+        let listed = search.isEmpty ? list : list.filter { search.matches($0, data: data) }
         // A table sizes to what it's given; in this scrolling page it's given a height for its rows.
-        let height = min(max(CGFloat(list.count) * 28 + 34, 120), 520)
+        let height = min(max(CGFloat(listed.count) * 28 + 34, 120), 520)
         return VStack(spacing: 0) {
             PanelHeader(title: "Entries on this card") {
-                Text(list.count == 1 ? "1 entry" : "\(list.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                Text(EntryFormat.count(listed.count, of: list.count, searching: !search.isEmpty)).font(.grotesk(12)).foregroundStyle(Color.kMuted)
             }
             if list.isEmpty {
                 Text("Nothing on this card yet.").font(.grotesk(12)).foregroundStyle(Color.kMuted)
                     .frame(maxWidth: .infinity, minHeight: 80)
+            } else if listed.isEmpty {
+                NoSearchMatches(search: search)
             } else {
-                EntriesTable(entries: list, data: data, selection: $selectedEntries, onAction: onEntryAction)
+                EntriesTable(entries: listed, data: data, selection: $selectedEntries, onAction: onEntryAction)
                     .frame(height: height)
             }
         }
