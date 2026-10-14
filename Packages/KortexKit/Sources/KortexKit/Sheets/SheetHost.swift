@@ -20,13 +20,25 @@ struct SheetHost: View {
         case .markPaid(let recurringUid, let dueOn):
             MarkPaidSheet(finance: finance, recurringUid: recurringUid, dueOn: dueOn, close: close)
         case .recurring(let uid):
-            RecurringSheet(finance: finance, editing: uid.flatMap { data.recurring[$0] }, close: close)
+            switch SheetRecord(uid, in: data.recurring) {
+            case .new: RecurringSheet(finance: finance, editing: nil, close: close)
+            case .editing(let recurring): RecurringSheet(finance: finance, editing: recurring, close: close)
+            case .gone: gone
+            }
         case .category(let uid, let kind):
-            CategorySheet(finance: finance, editing: uid.flatMap { data.categories[$0] }, kind: kind, close: close)
+            switch SheetRecord(uid, in: data.categories) {
+            case .new: CategorySheet(finance: finance, editing: nil, kind: kind, close: close)
+            case .editing(let category): CategorySheet(finance: finance, editing: category, kind: kind, close: close)
+            case .gone: gone
+            }
         case .deleteCategory(let uid):
             if let category = data.categories[uid] { DeleteCategorySheet(finance: finance, category: category, close: close) } else { gone }
         case .account(let uid, let kind):
-            AccountSheet(finance: finance, editing: uid.flatMap { data.accounts[$0] }, kind: kind, close: close)
+            switch SheetRecord(uid, in: data.accounts) {
+            case .new: AccountSheet(finance: finance, editing: nil, kind: kind, close: close)
+            case .editing(let account): AccountSheet(finance: finance, editing: account, kind: kind, close: close)
+            case .gone: gone
+            }
         case .receipt(let url):
             ReceiptSheet(finance: finance, file: url, close: close, enterManually: { model.sheet = .newEntry(.expense) })
         case .statement(let url, let into):
@@ -42,7 +54,20 @@ struct SheetHost: View {
     }
 }
 
-/// The toolbar's Add: a click adds an expense; the arrow offers everything else.
+/// What an add-or-edit sheet opens on. A record deleted on another device while its sheet is open
+/// is `gone`, never `new`: the sheet would keep its draft and Save would add the record back.
+enum SheetRecord<Record> {
+    case new
+    case editing(Record)
+    case gone
+
+    init(_ uid: String?, in records: [String: Record]) {
+        guard let uid else { self = .new; return }
+        self = records[uid].map { .editing($0) } ?? .gone
+    }
+}
+
+/// The toolbar's Add:a click adds an expense; the arrow offers everything else.
 struct AddMenu: View {
     let model: AppModel
 
