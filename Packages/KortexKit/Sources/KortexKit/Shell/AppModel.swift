@@ -25,7 +25,21 @@ public final class AppModel {
     /// The sheet over the window, if any.
     public var sheet: Sheet?
 
+    /// Who the recurring engine last ran for, and on which day.
+    @ObservationIgnored private var engineRan: (userUid: String, on: LocalDay)?
+
     public init() {}
+
+    /// Runs the phone's recurring engine (`RecurringRules.runEngine`) once a day for the signed-in
+    /// user, as soon as every collection is current with the server, so it sees what the phone has
+    /// already paid. Call it again when the status or the day changes.
+    public func runRecurringEngine(on finance: any FinanceStore, userUid: String, clock: FinanceClock = .system) {
+        let today = clock.today
+        guard finance.status == .live, engineRan?.userUid != userUid || engineRan?.on != today else { return }
+        engineRan = (userUid, today)
+        let change = RecurringRules.runEngine(in: finance.data, clock: clock)
+        if !change.writes.isEmpty { finance.apply(.success(change)) }
+    }
 
     /// Closes `sheet` if it's still the one showing, so a late close from a sheet that's already
     /// gone can't dismiss the one opened since.
