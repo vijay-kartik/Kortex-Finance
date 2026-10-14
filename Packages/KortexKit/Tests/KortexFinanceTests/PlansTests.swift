@@ -25,6 +25,55 @@ struct PlansTests {
         #expect(t.perYearMinor == (64_900 + 10_000 + 130_000) * 12)
     }
 
+    /// Expected values from kortex's RecurringScheduleTest.kt.
+    @Test func nextAfterKeepsToTheAnchorForEveryFrequency() {
+        let leap = recurring("prime", .subscription, .yearly, amount: 1_499_00, anchor: 29, next: day(2028, 2, 29))
+        #expect(RecurringSchedule.nextAfter(leap, day(2028, 2, 29)) == day(2029, 2, 28))
+        #expect(RecurringSchedule.nextAfter(leap, day(2029, 2, 28)) == day(2030, 2, 28))
+        #expect(RecurringSchedule.nextAfter(leap, day(2031, 2, 28)) == day(2032, 2, 29), "back on the 29th in a leap year")
+
+        let bimonthly = recurring("water", .fixed, .monthly, amount: 1, anchor: 10, next: day(2026, 10, 10), interval: 2)
+        #expect(RecurringSchedule.nextAfter(bimonthly, day(2026, 10, 10)) == day(2026, 12, 10))
+
+        let weekly = recurring("maid", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5))
+        #expect(RecurringSchedule.nextAfter(weekly, day(2026, 10, 5)) == day(2026, 10, 12))
+        #expect(RecurringSchedule.occurrences(weekly, until: day(2026, 11, 2)) ==
+                [day(2026, 10, 5), day(2026, 10, 12), day(2026, 10, 19), day(2026, 10, 26), day(2026, 11, 2)])
+        let fortnightly = recurring("maid", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5), interval: 2)
+        #expect(RecurringSchedule.nextAfter(fortnightly, day(2026, 10, 5)) == day(2026, 10, 19))
+        #expect(RecurringSchedule.nextAfter(weekly, day(2026, 10, 7)) == day(2026, 10, 19), "a moved date goes back to its weekday")
+    }
+
+    @Test func occurrencesStartAtTheNextDueDayOverdueIncludedAndStopWhenPaused() {
+        let netflix = recurring("netflix", .subscription, .monthly, amount: 649_00, anchor: 3, next: day(2026, 10, 3))
+        #expect(RecurringSchedule.occurrences(netflix, until: day(2026, 10, 29)) == [day(2026, 10, 3)])
+        let overdue = recurring("netflix", .subscription, .monthly, amount: 649_00, anchor: 3, next: day(2026, 9, 3))
+        #expect(RecurringSchedule.occurrences(overdue, until: day(2026, 10, 29)) == [day(2026, 9, 3), day(2026, 10, 3)])
+        let paused = recurring("netflix", .subscription, .monthly, amount: 649_00, anchor: 3, next: day(2026, 10, 3), paused: true)
+        #expect(RecurringSchedule.occurrences(paused, until: day(2027, 1, 1)).isEmpty)
+        let weekly = recurring("maid", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5))
+        #expect(RecurringSchedule.occurrences(weekly, until: day(2030, 1, 1)).count == 60)
+    }
+
+    @Test func nearestDueFindsTheOccurrenceAPaymentPays() {
+        let weekly = recurring("maid", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5))
+        #expect(RecurringSchedule.nearestDue(weekly, to: day(2026, 10, 8)) == day(2026, 10, 5), "three days late")
+        #expect(RecurringSchedule.nearestDue(weekly, to: day(2026, 10, 10)) == day(2026, 10, 12), "two days early")
+
+        let insurance = recurring("insurance", .fixed, .yearly, amount: 1, anchor: 2, next: day(2027, 1, 2))
+        #expect(RecurringSchedule.nearestDue(insurance, to: day(2027, 12, 30)) == day(2028, 1, 2), "early, across the new year")
+        #expect(RecurringSchedule.nearestDue(insurance, to: day(2028, 1, 6)) == day(2028, 1, 2))
+        let leap = recurring("prime", .subscription, .yearly, amount: 1, anchor: 29, next: day(2028, 2, 29))
+        #expect(RecurringSchedule.nearestDue(leap, to: day(2029, 3, 2)) == day(2029, 2, 28))
+    }
+
+    @Test func perMonthNormalisesWeeklyAndYearlyAmounts() {
+        #expect(RecurringSchedule.perMonthMinor(recurring("w", .fixed, .weekly, amount: 100_00, anchor: 1, next: day(2026, 10, 5))) == 433_33)
+        #expect(RecurringSchedule.perMonthMinor(recurring("y", .fixed, .yearly, amount: 1_499_00, anchor: 31, next: day(2027, 1, 31))) == 124_92)
+        #expect(RecurringSchedule.perMonthMinor(recurring("m", .fixed, .monthly, amount: 20_000_00, anchor: 31, next: day(2027, 1, 31),
+                                                          interval: 2)) == 10_000_00)
+    }
+
     @Test func labels() {
         let fortnightly = recurring("x", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5), interval: 2)
         #expect(RecurringSchedule.frequencyLabel(fortnightly) == "every 2 weeks")
