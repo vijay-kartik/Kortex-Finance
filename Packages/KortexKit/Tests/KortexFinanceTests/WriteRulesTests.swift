@@ -468,6 +468,132 @@ struct WriteRulesTests {
     }
 }
 
+/// Recurring payments, as kortex's RecurringPaymentsTest.kt.
+struct RecurringRulesTests {
+    private func saved(_ r: Result<Change, FinanceError>) throws -> Recurring {
+        guard case .recurring(let saved) = try r.get().writes.first else { throw CancellationError() }
+        return saved
+    }
+
+    private func paid(_ r: Result<Change, FinanceError>) throws -> (Recurring, Transaction) {
+        let writes = try r.get().writes
+        guard case .recurring(let moved) = writes[0], case .transaction(let tx) = writes[1] else { throw CancellationError() }
+        return (moved, tx)
+    }
+
+    @Test func aPaymentOnThe31stKeepsItsDayThroughShortMonthsAndEdits() throws {
+        var data = sample()
+        let draft = RecurringDraft(name: "Rent", kind: .fixed, amountMinor: 2_000_000, frequency: .monthly,
+                                   nextDueOn: day(2026, 10, 31), accountUid: "bank")
+        let rent = try saved(RecurringRules.save(nil, draft, in: data, clock: clock))
+        #expect(rent.anchorDay == 31)
+        data.apply([RemoteRow.live(rent)])
+
+        let (nov, _) = try paid(RecurringRules.markPaid(rent.uid, dueOn: day(2026, 10, 31), in: data, clock: clock))
+        #expect(nov.nextDueOn == day(2026, 11, 30))
+        data.apply([RemoteRow.live(nov)])
+
+        // Editing the amount, with the date left as shown, keeps the 31st.
+        var edit = RecurringDraft(nov)
+        edit.amountMinor = 2_100_000
+        let edited = try saved(RecurringRules.save(rent.uid, edit, in: data, clock: clock))
+        #expect(edited.uid == rent.uid && edited.amountMinor == 2_100_000)
+        #expect(edited.anchorDay == 31)
+        data.apply([RemoteRow.live(edited)])
+        let (dec, _) = try paid(RecurringRules.markPaid(rent.uid, dueOn: day(2026, 11, 30), in: data, clock: clock))
+        #expect(dec.nextDueOn == day(2026, 12, 31))
+
+        // A new date is a new anchor.
+        edit.nextDueOn = day(2026, 12, 15)
+        #expect(try saved(RecurringRules.save(rent.uid, edit, in: data, clock: clock)).anchorDay == 15)
+    }
+
+    @Test func aWeeklyPaymentIsAnchoredToItsWeekdayAndRepeatsAtLeastEveryWeek() throws {
+        let weekly = try saved(RecurringRules.save(nil, RecurringDraft(name: "Maid", kind: .fixed, amountMinor: 30_000, frequency: .weekly,
+                                                                       interval: 0, nextDueOn: day(2026, 10, 3), accountUid: "bank"),
+                                                   in: sample(), clock: clock))
+        #expect(weekly.anchorDay == day(2026, 10, 3).isoWeekday && weekly.anchorDay == 6, "a Saturday")
+        #expect(weekly.interval == 1)
+    }
+
+    @Test func savingChecksTheNameAmountAccountCategoryAndReminder() {
+        let data = sample()
+        let draft = RecurringDraft(name: "Netflix", kind: .subscription, amountMinor: 64_900, frequency: .monthly,
+                                   nextDueOn: day(2026, 10, 3), accountUid: "card")
+        func save(_ uid: String? = nil, _ change: (inout RecurringDraft) -> Void) -> FinanceError? {
+            var d = draft
+            change(&d)
+            return RecurringRules.save(uid, d, in: data, clock: clock).failure
+        }
+        #expect(save { $0.name = "  " } == .blankName)
+        #expect(save { $0.amountMinor = 0 } == .invalidAmount)
+        #expect(save { $0.remindDaysBefore = 8 } == .invalidReminder)
+        #expect(save { $0.remindDaysBefore = -2 } == .invalidReminder)
+        #expect(save { $0.accountUid = "nope" } == .unknownAccount)
+        #expect(save { $0.categoryUid = "salary" } == .wrongCategoryKind)
+        #expect(save("missing") { _ in } == .notFound)
+        #expect(save { $0.remindDaysBefore = 7; $0.categoryUid = "food" } == nil)
+    }
+
+    @Test func theFieldsOnMarkAsPaidOverrideTheRecurringPayments() throws {
+        let payment = PaymentDraft(amountMinor: 69_900, accountUid: "bank", paidOn: day(2026, 9, 27))
+        let (moved, tx) = try paid(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), payment: payment, in: sample(), clock: clock))
+        #expect(tx.amountMinor == 69_900)
+        #expect(tx.accountUid == "bank")
+        #expect(tx.occurredOn == day(2026, 9, 27))
+        #expect(tx.dueOn == day(2026, 10, 3))
+        #expect(moved.nextDueOn == day(2026, 11, 3))
+        #expect(moved.amountMinor == 64_900 && moved.accountUid == "card", "the payment itself is unchanged")
+    }
+
+    @Test func anOccurrencePaidOnAnotherDeviceIsSteppedOver() throws {
+        var data = sample()
+        // The phone has already paid 3 Nov.
+        let (_, nov) = try paid(RecurringRules.markPaid("netflix", dueOn: day(2026, 11, 3), in: data, clock: clock))
+        #expect(nov.uid == FinanceIds.recurringOccurrence("netflix", dueOn: day(2026, 11, 3)))
+        data.apply([RemoteRow.live(nov)])
+
+        let (moved, _) = try paid(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock))
+        #expect(moved.nextDueOn == day(2026, 12, 3))
+    }
+
+    @Test func payingAnOverdueOccurrenceLeavesALaterDueDateWhereItIs() throws {
+        var data = sample()
+        var netflix = try #require(data.recurring["netflix"])
+        netflix.nextDueOn = day(2026, 11, 3)
+        data.apply([RemoteRow.live(netflix)])
+        let (moved, tx) = try paid(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock))
+        #expect(moved.nextDueOn == day(2026, 11, 3))
+        #expect(tx.dueOn == day(2026, 10, 3))
+    }
+
+    @Test func aPaymentFromADeletedAccountIsntRecorded() {
+        var data = sample()
+        data.apply([RemoteRow<Account>.deleted(uid: "card")])
+        #expect(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock).failure == .unknownAccount)
+        #expect(RecurringRules.markPaid("missing", dueOn: day(2026, 10, 3), in: data, clock: clock).failure == .notFound)
+    }
+
+    @Test func pausingAndDeleting() throws {
+        var data = sample()
+        let paused = try saved(RecurringRules.setPaused("netflix", true, in: data, clock: clock))
+        #expect(paused.paused && paused.updatedAtMillis == clock.nowMillis)
+        #expect(paused.nextDueOn == day(2026, 10, 3))
+        data.apply([RemoteRow.live(paused)])
+        #expect(try saved(RecurringRules.setPaused("netflix", false, in: data, clock: clock)).paused == false)
+        #expect(RecurringRules.setPaused("missing", true, in: data, clock: clock).failure == .notFound)
+
+        // Deleting it keeps the expenses it recorded.
+        let (_, tx) = try paid(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock))
+        data.apply([RemoteRow.live(tx)])
+        let writes = try RecurringRules.delete("netflix", in: data, clock: clock).get().writes
+        #expect(writes.count == 1)
+        guard case .delete(let collection, let uid, let at) = writes.first else { Issue.record("expected a delete marker"); return }
+        #expect(collection == .recurring && uid == "netflix" && at == clock.nowMillis)
+        #expect(RecurringRules.delete("missing", in: data, clock: clock).failure == .notFound)
+    }
+}
+
 private extension Result {
     var failure: Failure? {
         if case .failure(let e) = self { return e }
