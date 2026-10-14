@@ -143,11 +143,46 @@ public enum RecurringRules {
         return .success(Change([.recurring(r)]))
     }
 
+    /// How many occurrences one payment may be caught up by at once, as kortex's `Occurrences.MAX_CATCH_UP`.
+    static let maxCatchUp = 60
+
+    /// The recurring half of kortex's RunFinanceEngine.kt, as one change. Each auto-debit due by
+    /// today is marked paid on its due day; one with no account to pay from waits in Pending. A
+    /// payment whose next occurrence was paid elsewhere moves its due date past it. Paused payments
+    /// are left alone. Paid occurrences have derived ids, so running it twice, or after the phone
+    /// has, writes nothing new.
+    public static func runEngine(in data: FinanceData, clock: FinanceClock = .system) -> Change {
+        let today = clock.today
+        var data = data
+        var writes: [RecordWrite] = []
+        for start in data.recurring.values.sorted(by: { $0.uid < $1.uid }) where !start.paused {
+            if start.autoMarkPaid {
+                var dueOn = start.nextDueOn
+                for _ in 0..<maxCatchUp {
+                    guard dueOn <= today,
+                          case .success(let change) = markPaid(start.uid, dueOn: dueOn, payment: PaymentDraft(paidOn: dueOn), in: data, clock: clock),
+                          !change.writes.isEmpty else { break }
+                    data.apply(change)
+                    writes += change.writes
+                    guard let next = data.recurring[start.uid]?.nextDueOn, next > dueOn else { break }
+                    dueOn = next
+                }
+            } else if data.transactions[FinanceIds.recurringOccurrence(start.uid, dueOn: start.nextDueOn)] != nil {
+                var moved = start
+                moved.nextDueOn = nextUnpaid(start, after: start.nextDueOn, in: data)
+                moved.updatedAtMillis = clock.nowMillis
+                data.apply(Change([.recurring(moved)]))
+                writes.append(.recurring(moved))
+            }
+        }
+        return Change(writes)
+    }
+
     /// The first occurrence after `dueOn` (or the current next due date, if later) that isn't paid
     /// yet; another device may already have paid the following ones.
     static func nextUnpaid(_ r: Recurring, after dueOn: LocalDay, in data: FinanceData) -> LocalDay {
         var next = dueOn < r.nextDueOn ? r.nextDueOn : RecurringSchedule.nextAfter(r, dueOn)
-        for _ in 0..<60 {
+        for _ in 0..<maxCatchUp {
             if data.transactions[FinanceIds.recurringOccurrence(r.uid, dueOn: next)] == nil { return next }
             next = RecurringSchedule.nextAfter(r, next)
         }

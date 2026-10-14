@@ -116,6 +116,71 @@ struct WriteRulesTests {
         if case .recurring(let r) = again.first { #expect(r.nextDueOn == day(2026, 11, 3)) }
     }
 
+    /// Netflix as an auto-debit next due on `next`; `clock` is 29 September.
+    private func autoDebit(next: LocalDay, accountUid: String = "bank", paused: Bool = false) -> FinanceData {
+        var data = sample()
+        var r = data.recurring["netflix"]!
+        r.anchorDay = next.day
+        r.nextDueOn = next
+        r.accountUid = accountUid
+        r.autoMarkPaid = true
+        r.paused = paused
+        data.apply([RemoteRow.live(r)])
+        return data
+    }
+
+    @Test func engineRecordsAutoDebitsOnTheirDueDayOnce() {
+        var data = autoDebit(next: day(2026, 9, 5))
+        let change = RecurringRules.runEngine(in: data, clock: clock)
+        data.apply(change)
+        let paid = data.transactions.values.filter { $0.recurringUid == "netflix" }
+        #expect(paid.count == 1)
+        #expect(paid.first?.uid == FinanceIds.recurringOccurrence("netflix", dueOn: day(2026, 9, 5)))
+        #expect(paid.first?.occurredOn == day(2026, 9, 5) && paid.first?.dueOn == day(2026, 9, 5))
+        #expect(paid.first?.accountUid == "bank")
+        #expect(data.recurring["netflix"]?.nextDueOn == day(2026, 10, 5))
+        #expect(RecurringRules.runEngine(in: data, clock: clock).writes.isEmpty, "running again writes nothing")
+    }
+
+    @Test func engineCatchesUpEveryMissedAutoDebitUpToToday() {
+        var data = autoDebit(next: day(2026, 7, 29))
+        data.apply(RecurringRules.runEngine(in: data, clock: clock))
+        let paidOn = data.transactions.values.filter { $0.recurringUid == "netflix" }.map(\.occurredOn).sorted()
+        #expect(paidOn == [day(2026, 7, 29), day(2026, 8, 29), day(2026, 9, 29)])
+        #expect(data.recurring["netflix"]?.nextDueOn == day(2026, 10, 29))
+    }
+
+    @Test func engineLeavesPausedAndAccountlessAutoDebitsInPending() {
+        for data in [autoDebit(next: day(2026, 9, 5), paused: true), autoDebit(next: day(2026, 9, 5), accountUid: "gone")] {
+            #expect(RecurringRules.runEngine(in: data, clock: clock).writes.isEmpty)
+        }
+    }
+
+    @Test func engineOnlyMovesTheDateOfAnAutoDebitPaidElsewhere() {
+        var data = autoDebit(next: day(2026, 9, 5))
+        data.apply(RecurringRules.runEngine(in: data, clock: clock))
+        // Paid on the phone, but its due date not moved on here yet: no second entry.
+        var stale = data.recurring["netflix"]!
+        stale.nextDueOn = day(2026, 9, 5)
+        data.apply([RemoteRow.live(stale)])
+        let writes = RecurringRules.runEngine(in: data, clock: clock).writes
+        #expect(writes.count == 1)
+        if case .recurring(let r) = writes.first { #expect(r.nextDueOn == day(2026, 10, 5)) }
+    }
+
+    @Test func engineMovesAPaymentPaidElsewherePastItsPaidOccurrences() throws {
+        var data = sample()
+        for due in [day(2026, 10, 3), day(2026, 11, 3)] {
+            let change = try RecurringRules.markPaid("netflix", dueOn: due, in: data, clock: clock).get()
+            data.apply(Change(change.writes.filter { if case .transaction = $0 { true } else { false } }))
+        }
+        #expect(data.recurring["netflix"]?.nextDueOn == day(2026, 10, 3))
+        data.apply(RecurringRules.runEngine(in: data, clock: clock))
+        #expect(data.recurring["netflix"]?.nextDueOn == day(2026, 12, 3))
+        #expect(data.transactions.count == 2, "nothing is paid for a payment that isn't an auto-debit")
+        #expect(RecurringRules.runEngine(in: data, clock: clock).writes.isEmpty)
+    }
+
     @Test func skipAndAnchors() {
         let data = sample()
         guard case .recurring(let r) = writes(RecurringRules.skip("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock)).first else {

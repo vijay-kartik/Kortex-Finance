@@ -31,6 +31,14 @@ public struct RootView: View {
                     SheetHost(sheet: sheet, finance: session.finance, model: model, close: { model.dismiss(sheet) })
                 }
                 .modifier(ReceiptDropTarget(model: model))
+                .onChange(of: session.finance.status, initial: true) {
+                    model.runRecurringEngine(on: session.finance, userUid: user.uid)
+                }
+                .task(id: user.uid) {
+                    for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
+                        model.runRecurringEngine(on: session.finance, userUid: user.uid)
+                    }
+                }
             }
         }
         .preferredColorScheme(.dark)
