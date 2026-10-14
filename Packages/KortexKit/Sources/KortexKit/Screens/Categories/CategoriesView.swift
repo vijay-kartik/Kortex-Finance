@@ -21,15 +21,17 @@ struct CategoriesView: View {
         "salary": "Built in",
     ]
 
+    // Nothing here reads the list selection: that would re-run this whole body, totals and all, on
+    // every click and arrow key. Only CategoriesInspector reads it; the list gets it as a binding.
     var body: some View {
         let data = finance.data
         let today = LocalDay.today()
         let month = today.yearMonth
-        let txs = Array(data.transactions.values)
-        let counts = Spending.entriesPerCategory(txs)
-        let (monthTotals, monthCounts) = Self.monthByCategory(txs, from: month.firstDay, to: today)
-        let spentThisMonth = Spending.spentMinor(txs, from: month.firstDay, to: today)
-        let incomeThisMonth = Spending.incomeMinor(txs, from: month.firstDay, to: today)
+        let counts = Spending.entriesPerCategory(data.transactions.values)
+        let thisMonth = data.transactions.values.filter { $0.occurredOn.isWithin(month.firstDay, today) }
+        let (monthTotals, monthCounts) = Self.monthByCategory(thisMonth, from: month.firstDay, to: today)
+        let spentThisMonth = Spending.spentMinor(thisMonth, from: month.firstDay, to: today)
+        let incomeThisMonth = Spending.incomeMinor(thisMonth, from: month.firstDay, to: today)
         let all = data.categories.values.sorted { ($0.kind.rawValue, $0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.kind.rawValue, $1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
         let groups: [(String, [SpendCategory])] = [
             ("EXPENSE · BUILT IN", all.filter { $0.kind == .expense && $0.builtIn }),
@@ -102,9 +104,7 @@ struct CategoriesView: View {
             }
         }
         .sidePanel(isPresented: showsInspector) {
-            CategoryInspector(category: model.selectedCategoryUid.flatMap { data.categories[$0] }, data: data, today: today,
-                              onEdit: { model.sheet = .category($0.uid, $0.kind) },
-                              onDelete: { model.sheet = .deleteCategory($0.uid) })
+            CategoriesInspector(model: model, data: data, today: today)
         }
     }
 
@@ -154,6 +154,20 @@ struct CategoriesView: View {
     }
 }
 
+/// The selected category's inspector. Its own view so that only it re-runs when the list
+/// selection changes.
+private struct CategoriesInspector: View {
+    let model: AppModel
+    let data: FinanceData
+    let today: LocalDay
+
+    var body: some View {
+        CategoryInspector(category: model.selectedCategoryUid.flatMap { data.categories[$0] }, data: data, today: today,
+                          onEdit: { model.sheet = .category($0.uid, $0.kind) },
+                          onDelete: { model.sheet = .deleteCategory($0.uid) })
+    }
+}
+
 /// The selected category: six months of spend in it and the merchants filed under it.
 struct CategoryInspector: View {
     let category: SpendCategory?
@@ -180,7 +194,8 @@ struct CategoryInspector: View {
     private func details(_ c: SpendCategory) -> some View {
         let txs = data.transactions.values.filter { $0.categoryUid == c.uid && ($0.type == .expense || $0.type == .income) }
         let months = (0..<6).reversed().map { today.yearMonth.adding(months: -$0) }
-        let perMonth = months.map { m in txs.filter { $0.occurredOn.yearMonth == m }.reduce(Int64(0)) { $0 + $1.amountMinor } }
+        let byMonth = txs.reduce(into: [YearMonth: Int64]()) { $0[$1.occurredOn.yearMonth, default: 0] += $1.amountMinor }
+        let perMonth = months.map { byMonth[$0] ?? 0 }
         let peak = max(perMonth.max() ?? 0, 1)
         let merchants = data.merchants.values.filter { $0.categoryUid == c.uid }.sorted { $0.displayName < $1.displayName }
         let color = Color.token(c.colorToken)
