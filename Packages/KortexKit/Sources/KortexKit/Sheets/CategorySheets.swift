@@ -32,18 +32,15 @@ struct CategorySheet: View {
             onPrimary: save
         ) {
             if editing == nil {
-                Section {
-                    LabeledContent("Type") {
-                        KSegmented("Type", selection: $kind, options: [(CategoryKind.expense, "Expense"), (.income, "Income")])
-                    }
+                SheetSection {
+                    KSegmented("Type", selection: $kind, options: [(CategoryKind.expense, "Expense"), (.income, "Income")])
                 } footer: {
                     Text(kind == .expense ? "Shows up when you add an expense." : "Shows up when you add income.")
-                        .font(.grotesk(11)).foregroundStyle(Color.kMuted)
                 }
             }
-            Section {
-                TextField("Name", text: $name, prompt: Text("Groceries"))
-                LabeledContent("Colour") {
+            SheetSection {
+                KTextField("Name", text: $name, prompt: "Groceries")
+                KField("Colour") {
                     HStack(spacing: 8) {
                         ForEach(Self.colors, id: \.self) { token in
                             Button { color = token } label: {
@@ -57,7 +54,7 @@ struct CategorySheet: View {
                     }
                 }
             } footer: {
-                Text("Kortex suggests it for merchants you file under it.").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                Text("Kortex suggests it for merchants you file under it.")
             }
         }
     }
@@ -93,7 +90,8 @@ struct DeleteCategorySheet: View {
                 if let failure = finance.apply(CategoryRules.delete(category.uid, moveTo: moveTo, in: finance.data)) { error = failure.message } else { close() }
             }
         ) {
-            Picker("Move its entries to", selection: $moveTo) {
+            KMenuField("Move its entries to", selection: $moveTo,
+                       value: moveTo.map { uid in targets.first { $0.uid == uid }?.name ?? "Deleted category" } ?? "Uncategorised") {
                 Text("Uncategorised").tag(String?.none)
                 ForEach(targets) { Text($0.name).tag(String?.some($0.uid)) }
             }

@@ -42,21 +42,26 @@ struct PayBillSheet: View {
             onCancel: close,
             onPrimary: { save(unpaid: unpaid, minimum: minimum) }
         ) {
-            Section {
+            SheetSection(header: "Amount") {
                 Picker("Amount", selection: $choice) {
                     Text("Full bill · \(Money.format(unpaid))").tag(Choice.full)
                     if minimum > 0 && minimum < unpaid { Text("Minimum · \(Money.format(minimum))").tag(Choice.minimum) }
                     Text("Other amount").tag(Choice.other)
                 }
                 .pickerStyle(.radioGroup)
+                .labelsHidden()
+                .font(.grotesk(13))
+                .foregroundStyle(Color.kInk)
                 if choice == .other { AmountField(label: "Amount", text: $other) }
             }
-            Section {
-                AccountPicker(label: "Paid from", selection: $fromUid, accounts: from)
-                DatePicker("Paid on", selection: $date, in: ...Date(), displayedComponents: .date)
+            SheetSection {
+                KFieldRow(trailingWidth: nil) {
+                    AccountPicker(label: "Paid from", selection: $fromUid, accounts: from)
+                } trailing: {
+                    KDateField("Paid on", selection: $date, latest: Date())
+                }
             } footer: {
                 Text("A bill payment isn't spending: the purchases on the card already were.")
-                    .font(.grotesk(11)).foregroundStyle(Color.kMuted)
             }
         }
     }
@@ -107,12 +112,15 @@ struct MarkPaidSheet: View {
             onCancel: close,
             onPrimary: save
         ) {
-            Section {
+            SheetSection {
                 AmountField(label: "Amount", text: $amount)
-                AccountPicker(label: "Paid with", selection: $fromUid, accounts: accounts)
-                DatePicker("Paid on", selection: $date, in: ...Date(), displayedComponents: .date)
+                KFieldRow(trailingWidth: nil) {
+                    AccountPicker(label: "Paid with", selection: $fromUid, accounts: accounts)
+                } trailing: {
+                    KDateField("Paid on", selection: $date, latest: Date())
+                }
             } footer: {
-                Text("Records the expense and moves the next due date on.").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                Text("Records the expense and moves the next due date on.")
             }
         }
     }

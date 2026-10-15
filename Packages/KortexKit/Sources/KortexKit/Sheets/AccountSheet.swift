@@ -44,34 +44,44 @@ struct AccountSheet: View {
             onPrimary: save
         ) {
             if editing == nil {
-                LabeledContent("Kind") {
-                    KSegmented("Kind", selection: $draft.kind, options: [
-                        (AccountKind.bank, "Bank"), (.creditCard, "Credit card"), (.debitCard, "Debit card"),
-                        (.wallet, "Wallet"), (.cash, "Cash"),
-                    ])
-                }
+                KSegmented("Kind", selection: $draft.kind, options: [
+                    (AccountKind.bank, "Bank"), (.creditCard, "Credit card"), (.debitCard, "Debit card"),
+                    (.wallet, "Wallet"), (.cash, "Cash"),
+                ])
             }
-            Section {
-                TextField("Name", text: $draft.name, prompt: Text(draft.kind.isCard ? "KORTEX" : "Checking Account"))
-                if draft.kind != .cash {
-                    TextField("Bank", text: optional(\.institution), prompt: Text("HDFC Bank"))
+            SheetSection {
+                if draft.kind == .cash {
+                    KTextField("Name", text: $draft.name, prompt: "Checking Account")
+                } else {
+                    KFieldRow(trailingWidth: nil) {
+                        KTextField("Name", text: $draft.name, prompt: draft.kind.isCard ? "KORTEX" : "Checking Account")
+                    } trailing: {
+                        KTextField("Bank", text: optional(\.institution), prompt: "HDFC Bank")
+                    }
                     numberField
                 }
                 if draft.kind == .bank {
-                    Picker("Type", selection: $draft.bankType) {
-                        Text("Savings").tag(BankType?.some(.savings))
-                        Text("Current").tag(BankType?.some(.current))
+                    KFieldRow {
+                        KTextField("IFSC", text: optional(\.ifsc), prompt: "HDFC0001234", font: .mono(13))
+                    } trailing: {
+                        KMenuField("Type", selection: $draft.bankType, value: draft.bankType.map { $0 == .current ? "Current" : "Savings" }) {
+                            Text("Savings").tag(BankType?.some(.savings))
+                            Text("Current").tag(BankType?.some(.current))
+                        }
                     }
-                    TextField("IFSC", text: optional(\.ifsc), prompt: Text("HDFC0001234"))
                 }
             }
             if draft.kind.isCard {
-                Section {
-                    TextField("Card holder", text: optional(\.holder), prompt: Text("Aarav Mehta"))
-                    TextField("Network", text: optional(\.network), prompt: Text("Visa, Mastercard, RuPay"))
-                    TextField("Expires", text: optional(\.expiry), prompt: Text("MM/YY"))
+                SheetSection {
+                    KTextField("Card holder", text: optional(\.holder), prompt: "Aarav Mehta")
+                    KFieldRow {
+                        KTextField("Network", text: optional(\.network), prompt: "Visa, Mastercard, RuPay")
+                    } trailing: {
+                        KTextField("Expires", text: optional(\.expiry), prompt: "MM/YY", font: .mono(13))
+                    }
                     if draft.kind == .debitCard && editing == nil {
-                        Picker("Spends come out of", selection: $draft.linkedAccountUid) {
+                        KMenuField("Spends come out of", selection: $draft.linkedAccountUid,
+                                   value: draft.linkedAccountUid.map { uid in banks.first { $0.uid == uid }?.name ?? "A bank account" } ?? "Its own balance") {
                             Text("Its own balance").tag(String?.none)
                             ForEach(banks) { Text($0.name).tag(String?.some($0.uid)) }
                         }
@@ -79,48 +89,57 @@ struct AccountSheet: View {
                 }
             }
             if draft.kind == .creditCard {
-                Section {
+                SheetSection {
                     AmountField(label: "Credit limit", text: $limit)
-                    Picker("Statement day", selection: $draft.statementDay) {
-                        Text("Not set").tag(Int?.none)
-                        ForEach(1...31, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
-                    }
-                    Picker("Payment due day", selection: $draft.dueDay) {
-                        Text("Not set").tag(Int?.none)
-                        ForEach(1...31, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
+                    KFieldRow(trailingWidth: nil) {
+                        dayField("Statement day", $draft.statementDay)
+                    } trailing: {
+                        dayField("Payment due day", $draft.dueDay)
                     }
                 } footer: {
-                    Text("With both days set, Kortex works out each bill on your phone.").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                    Text("With both days set, Kortex works out each bill on your phone.")
                 }
             }
             if !(draft.kind == .debitCard && draft.linkedAccountUid != nil) {
-                Section {
+                SheetSection {
                     AmountField(label: draft.kind == .creditCard ? (editing == nil ? "Outstanding today" : "Owed at the start") : "Opening balance",
                                 text: $opening)
                 } footer: {
-                    Text(openingFooter).font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                    Text(openingFooter)
                 }
             }
         }
         .onDisappear { saveTask?.cancel() }
     }
 
+    /// A day of the month, or not set.
+    private func dayField(_ label: String, _ day: Binding<Int?>) -> some View {
+        KMenuField(label, selection: day, value: day.wrappedValue.map(String.init) ?? "Not set") {
+            Text("Not set").tag(Int?.none)
+            ForEach(1...31, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
+        }
+    }
+
     @ViewBuilder private var numberField: some View {
-        TextField("Number", text: $number, prompt: Text(editing?.last4.map { "•••• \($0)" } ?? "Full number, or just the last 4"))
-            .font(.mono(13))
+        KTextField("Number", text: $number, prompt: editing?.last4.map { "•••• \($0)" } ?? "Full number, or just the last 4", font: .mono(13))
         if let editing, editing.hasSecret {
-            LabeledContent("Full number") {
+            KField("Full number") {
                 HStack(spacing: 8) {
                     if let revealed {
-                        Text(AccountNumbers.grouped(revealed)).font(.mono(13)).textSelection(.enabled)
+                        Text(AccountNumbers.grouped(revealed)).font(.mono(13)).foregroundStyle(Color.kInk).textSelection(.enabled)
+                        Spacer(minLength: 0)
                         Button(copied ? "Copied, clears in 1 min" : "Copy") {
                             SensitivePasteboard.copy(revealed)
                             copied = true
                         }
-                        Button("Hide") { self.revealed = nil; copied = false }
+                        .buttonStyle(.kortex(.secondary, size: .small))
+                        Button("Hide") { self.revealed = nil; copied = false }.buttonStyle(.kortex(.secondary, size: .small))
                     } else {
-                        Text("Kept encrypted").foregroundStyle(Color.kMuted)
-                        Button(revealing ? "Opening…" : "Show") { reveal(editing) }.disabled(revealing)
+                        Text("Kept encrypted").font(.grotesk(15)).foregroundStyle(Color.kMuted)
+                        Spacer(minLength: 0)
+                        Button(revealing ? "Opening…" : "Show") { reveal(editing) }
+                            .buttonStyle(.kortex(.secondary, size: .small))
+                            .disabled(revealing)
                     }
                 }
             }
