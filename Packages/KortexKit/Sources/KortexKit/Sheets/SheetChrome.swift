@@ -1,8 +1,8 @@
 import KortexFinance
 import SwiftUI
 
-/// The frame every Kortex sheet shares: a title, a native grouped form, the reason a save was
-/// refused, and Cancel (esc) / primary (⏎) buttons.
+/// The frame every Kortex sheet shares: a title, its fields (scrolling when tall), the reason a save
+/// was refused, and Cancel (esc) / primary (⏎) buttons.
 struct SheetChrome<Content: View>: View {
     let title: String
     var subtitle: String?
@@ -21,9 +21,12 @@ struct SheetChrome<Content: View>: View {
             }
             .padding(.horizontal, 24)
             .padding(.top, 22)
-            Form { content }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) { content }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 18)
+            }
+            .scrollBounceBehavior(.basedOnSize)
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.grotesk(12))
@@ -48,23 +51,48 @@ struct SheetChrome<Content: View>: View {
     }
 }
 
-/// An amount field: "₹" then the number, in the Figma's big synapse type.
+/// Fields that belong together in a sheet: an optional header above them (Space Grotesk 13) and a
+/// note below (Space Grotesk 12), both Muted unless the note says otherwise.
+struct SheetSection<Content: View, Footer: View>: View {
+    var header: String?
+    @ViewBuilder var content: Content
+    @ViewBuilder var footer: Footer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let header { Text(header).font(.grotesk(13)).foregroundStyle(Color.kMuted) }
+            content
+            footer.font(.grotesk(12)).foregroundStyle(Color.kMuted)
+        }
+    }
+}
+
+extension SheetSection where Footer == EmptyView {
+    init(header: String? = nil, @ViewBuilder content: () -> Content) {
+        self.header = header
+        self.content = content()
+        self.footer = EmptyView()
+    }
+}
+
+/// An amount field: "₹" then the number, in the Figma's big Synapse type (Space Grotesk 28 medium).
 struct AmountField: View {
     let label: String
     @Binding var text: String
 
+    @FocusState private var focused: Bool
+
     var body: some View {
-        LabeledContent(label) {
-            HStack(spacing: 4) {
-                Text("₹").foregroundStyle(Color.kMuted)
-                TextField(label, text: $text, prompt: Text("0.00"))
+        KField(label, focused: focused) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("₹").accessibilityHidden(true)
+                TextField(label, text: $text, prompt: Text("0.00").foregroundStyle(Color.kSynapse.opacity(0.4)))
                     .labelsHidden()
                     .textFieldStyle(.plain)
-                    .multilineTextAlignment(.trailing)
-                    .font(.mono(18))
-                    .foregroundStyle(Color.kSynapse)
+                    .focused($focused)
             }
-            .frame(maxWidth: 220)
+            .font(.grotesk(28, .medium))
+            .foregroundStyle(Color.kSynapse)
         }
     }
 }
@@ -76,12 +104,14 @@ struct AccountPicker: View {
     let accounts: [Account]
 
     var body: some View {
-        Picker(label, selection: $selection) {
+        KMenuField(label, selection: $selection, value: accounts.first { $0.uid == selection }.map(Self.name)) {
             if !accounts.contains(where: { $0.uid == selection }) { Text("Choose…").tag("") }
-            ForEach(accounts) { a in
-                Text(a.last4.map { "\(a.name) ••\($0)" } ?? a.name).tag(a.uid)
-            }
+            ForEach(accounts) { a in Text(Self.name(a)).tag(a.uid) }
         }
+    }
+
+    private static func name(_ a: Account) -> String {
+        a.last4.map { "\(a.name) ••\($0)" } ?? a.name
     }
 }
 

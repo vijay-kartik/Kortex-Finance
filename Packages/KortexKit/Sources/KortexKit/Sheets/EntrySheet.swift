@@ -120,11 +120,9 @@ struct EntrySheet: View {
             onPrimary: save
         ) {
             if canChangeType {
-                LabeledContent("Type") {
-                    KSegmented("Type", selection: $type, options: [
-                        (TransactionType.expense, "Expense"), (.income, "Income"), (.transfer, "Transfer"),
-                    ] + (canBeCardPayment ? [(.cardPayment, "Card bill")] : []))
-                }
+                KSegmented("Type", selection: $type, options: [
+                    (TransactionType.expense, "Expense"), (.income, "Income"), (.transfer, "Transfer"),
+                ] + (canBeCardPayment ? [(.cardPayment, "Card bill")] : []))
                 .onChange(of: type) { _, new in
                     categoryUid = editing.flatMap { $0.type == new ? $0.categoryUid : nil }
                     categoryTouched = editing != nil
@@ -134,45 +132,43 @@ struct EntrySheet: View {
                     }
                 }
             }
-            Section {
+            KFieldRow {
                 AmountField(label: "Amount", text: $amount)
-                DatePicker("Date", selection: $date, in: ...Date(), displayedComponents: .date)
+            } trailing: {
+                KDateField("Date", selection: $date, latest: Date())
             }
             if type == .cardPayment {
                 cardPaymentSection(data, all: all)
             } else if type == .transfer {
-                Section {
-                    AccountPicker(label: "From", selection: $accountUid, accounts: fromAccounts)
-                    AccountPicker(label: "To", selection: $toAccountUid, accounts: fromAccounts.filter { $0.uid != accountUid })
+                SheetSection {
+                    KFieldRow(trailingWidth: nil) {
+                        AccountPicker(label: "From", selection: $accountUid, accounts: fromAccounts)
+                    } trailing: {
+                        AccountPicker(label: "To", selection: $toAccountUid, accounts: fromAccounts.filter { $0.uid != accountUid })
+                    }
                 } footer: {
                     if let editing, editing.type != .transfer, let text = otherSideNote(editing, data) {
-                        Text(text).font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                        Text(text)
                     }
                 }
             } else {
-                Section {
-                    TextField(type == .income ? "From" : "Merchant / description", text: $merchant,
-                              prompt: Text(type == .income ? "Acme Corp" : "Whole Foods Market"))
+                KFieldRow {
+                    KTextField(type == .income ? "From" : "Merchant / description", text: $merchant,
+                               prompt: type == .income ? "Acme Corp" : "Whole Foods Market")
                         .onChange(of: merchant) { _, new in
                             if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, in: data) }
                         }
+                } trailing: {
                     AccountPicker(label: type == .income ? "Received in" : "Paid with", selection: $accountUid, accounts: fromAccounts)
                 }
-                Section {
+                SheetSection(header: suggested.flatMap { data.categories[$0]?.name }.flatMap { name in
+                    merchant.cleanedForUI.map { "Kortex filed \($0) under \(name) before" }
+                } ?? "Category") {
                     CategoryChips(selection: Binding(get: { categoryUid }, set: { categoryUid = $0; categoryTouched = true }),
                                   categories: categories, suggested: suggested)
-                } header: {
-                    if let suggested, let name = data.categories[suggested]?.name, merchant.cleanedForUI != nil {
-                        Text("Kortex filed \(merchant.cleanedForUI!) under \(name) before")
-                    } else {
-                        Text("Category")
-                    }
                 }
             }
-            Section {
-                TextField("Note", text: $note, prompt: Text("Add a note"), axis: .vertical)
-                    .lineLimit(1...3)
-            }
+            KTextField("Note", text: $note, prompt: "Add a note", font: .grotesk(14), axis: .vertical, lines: 1...3)
         }
         .confirmationDialog(refiling.map { refileTitle($0, data) } ?? "",
                             isPresented: Binding(get: { refiling != nil }, set: { if !$0 { refiling = nil } })) {
@@ -225,33 +221,36 @@ struct EntrySheet: View {
         let cards = all.filter { $0.kind == .creditCard }
         let bills = data.statements.values.filter { $0.cardUid == toAccountUid }.sorted { $0.statementOn > $1.statementOn }
         let credit = editing?.isCardCredit == true
-        return Section {
-            if credit {
-                LabeledContent("From", value: "Refund / credit")
-            } else {
-                Picker("Paid from", selection: $accountUid) {
-                    if accountUid.isEmpty { Text("Choose…").tag("") }
-                    ForEach(payFrom) { a in Text(EntryFormat.account(a.uid, data)).tag(a.uid) }
-                    Text("Unknown account").tag(FinanceIds.unknownAccount)
-                }
-            }
-            AccountPicker(label: "Card", selection: $toAccountUid, accounts: cards)
-                .onChange(of: toAccountUid) { _, card in
-                    // Another card: its bill for the day, unless it's the card the payment had.
-                    statementUid = editing.flatMap { $0.toAccountUid == card && $0.type == .cardPayment ? $0.statementUid : nil }
-                        ?? (credit ? nil : EntryRules.billPaid(card, on: LocalDay(date: date), in: data)?.uid)
-                }
-            if !credit {
-                Picker("Pays bill", selection: $statementUid) {
-                    Text("No bill").tag(String?.none)
-                    ForEach(bills) { b in
-                        Text("\(b.statementOn.date.formatted(.dateTime.day().month(.abbreviated).year())) bill · \(Money.format(b.totalDueMinor)) due")
-                            .tag(String?.some(b.uid))
+        let billName = { (b: CardStatement) in
+            "\(b.statementOn.date.formatted(.dateTime.day().month(.abbreviated).year())) bill · \(Money.format(b.totalDueMinor)) due"
+        }
+        return SheetSection {
+            KFieldRow(trailingWidth: nil) {
+                if credit {
+                    KField("From") { Text("Refund / credit").font(.grotesk(15)).foregroundStyle(Color.kInk) }
+                } else {
+                    KMenuField("Paid from", selection: $accountUid, value: accountUid.isEmpty ? nil : EntryFormat.account(accountUid, data)) {
+                        if accountUid.isEmpty { Text("Choose…").tag("") }
+                        ForEach(payFrom) { a in Text(EntryFormat.account(a.uid, data)).tag(a.uid) }
+                        Text("Unknown account").tag(FinanceIds.unknownAccount)
                     }
+                }
+            } trailing: {
+                AccountPicker(label: "Card", selection: $toAccountUid, accounts: cards)
+                    .onChange(of: toAccountUid) { _, card in
+                        // Another card: its bill for the day, unless it's the card the payment had.
+                        statementUid = editing.flatMap { $0.toAccountUid == card && $0.type == .cardPayment ? $0.statementUid : nil }
+                            ?? (credit ? nil : EntryRules.billPaid(card, on: LocalDay(date: date), in: data)?.uid)
+                    }
+            }
+            if !credit {
+                KMenuField("Pays bill", selection: $statementUid, value: statementUid.map { uid in bills.first { $0.uid == uid }.map(billName) ?? "A bill" } ?? "No bill") {
+                    Text("No bill").tag(String?.none)
+                    ForEach(bills) { b in Text(billName(b)).tag(String?.some(b.uid)) }
                 }
             }
         } footer: {
-            Text(cardPaymentNote(data, credit: credit)).font(.grotesk(11)).foregroundStyle(Color.kMuted)
+            Text(cardPaymentNote(data, credit: credit))
         }
     }
 

@@ -38,38 +38,58 @@ struct RecurringSheet: View {
             onCancel: close,
             onPrimary: save
         ) {
-            Section {
-                LabeledContent("Type") {
-                    KSegmented("Type", selection: $draft.kind, options: [(RecurringKind.subscription, "Subscription"), (.fixed, "Fixed expense")])
-                }
+            SheetSection {
+                KSegmented("Type", selection: $draft.kind, options: [(RecurringKind.subscription, "Subscription"), (.fixed, "Fixed expense")])
             } footer: {
                 Text(draft.kind == .subscription ? "Something you can cancel, like Netflix or Spotify." : "Rent, EMIs, utilities.")
-                    .font(.grotesk(11)).foregroundStyle(Color.kMuted)
             }
-            Section {
-                TextField("Name", text: $draft.name, prompt: Text("Netflix"))
+            KFieldRow(trailingWidth: nil) {
+                KTextField("Name", text: $draft.name, prompt: "Netflix")
+            } trailing: {
                 AmountField(label: "Amount", text: $amount)
             }
-            Section {
-                Picker("Repeats", selection: $draft.frequency) {
-                    Text("Every week").tag(Frequency.weekly)
-                    Text("Every month").tag(Frequency.monthly)
-                    Text("Every year").tag(Frequency.yearly)
+            SheetSection {
+                KFieldRow(trailingWidth: nil) {
+                    KMenuField("Repeats", selection: $draft.frequency, value: frequencyName) {
+                        Text("Every week").tag(Frequency.weekly)
+                        Text("Every month").tag(Frequency.monthly)
+                        Text("Every year").tag(Frequency.yearly)
+                    }
+                } trailing: {
+                    KField("Interval") {
+                        Stepper("Every \(draft.interval) \(unit)\(draft.interval == 1 ? "" : "s")", value: $draft.interval, in: 1...12)
+                            .font(.grotesk(15))
+                            .foregroundStyle(Color.kInk)
+                    }
                 }
-                Stepper("Every \(draft.interval) \(unit)\(draft.interval == 1 ? "" : "s")", value: $draft.interval, in: 1...12)
-                DatePicker("Next due", selection: $dueDate, displayedComponents: .date)
-                AccountPicker(label: "Paid from", selection: $draft.accountUid, accounts: accounts)
-                Picker("Category", selection: $draft.categoryUid) {
-                    Text("Uncategorised").tag(String?.none)
-                    ForEach(categories) { Text($0.name).tag(String?.some($0.uid)) }
+                KFieldRow(trailingWidth: nil) {
+                    KDateField("Next due", selection: $dueDate)
+                } trailing: {
+                    AccountPicker(label: "Paid from", selection: $draft.accountUid, accounts: accounts)
                 }
-                Picker("Remind me", selection: $draft.remindDaysBefore) {
-                    ForEach([-1, 0, 1, 2, 3, 7], id: \.self) { Text(RecurringSchedule.reminderLabel($0)).tag($0) }
+                KFieldRow(trailingWidth: nil) {
+                    KMenuField("Category", selection: $draft.categoryUid,
+                               value: draft.categoryUid.map { uid in categories.first { $0.uid == uid }?.name ?? "Deleted category" } ?? "Uncategorised") {
+                        Text("Uncategorised").tag(String?.none)
+                        ForEach(categories) { Text($0.name).tag(String?.some($0.uid)) }
+                    }
+                } trailing: {
+                    KMenuField("Remind me", selection: $draft.remindDaysBefore, value: RecurringSchedule.reminderLabel(draft.remindDaysBefore)) {
+                        ForEach([-1, 0, 1, 2, 3, 7], id: \.self) { Text(RecurringSchedule.reminderLabel($0)).tag($0) }
+                    }
                 }
+            }
+            SheetSection {
                 Toggle("Mark it paid automatically on the due date (for auto-debits)", isOn: $draft.autoMarkPaid)
                 if editing != nil { Toggle("Paused", isOn: $draft.paused) }
             }
+            .font(.grotesk(13))
+            .foregroundStyle(Color.kInk)
         }
+    }
+
+    private var frequencyName: String {
+        switch draft.frequency { case .weekly: "Every week"; case .monthly: "Every month"; case .yearly: "Every year" }
     }
 
     private var unit: String {

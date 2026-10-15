@@ -232,6 +232,173 @@ struct KSegmented<Value: Hashable>: View {
     }
 }
 
+/// The Figma "Field": a Void box (radius 10, padding 14×10) with an Edge hairline that turns Synapse
+/// while `focused`, a JetBrains Mono 10 caps label over the value. Values are Space Grotesk 15 Ink.
+/// Use `KTextField`, `KDateField` and `KMenuField` for text, dates and choices; they track their own
+/// focus. VoiceOver reads the field by its label. Fields fill the height of an `HStack` pair.
+struct KField<Content: View>: View {
+    let label: String
+    var focused = false
+    @ViewBuilder var content: Content
+
+    init(_ label: String, focused: Bool = false, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.focused = focused
+        self.content = content()
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 10)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased()).sectionLabelStyle().lineLimit(1).accessibilityHidden(true)
+            content
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.kVoid, in: shape)
+        .overlay(shape.strokeBorder(focused ? Color.kSynapse : Color.kEdge))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(label)
+    }
+}
+
+/// Two fields side by side, as the Figma pairs them (Amount | Date, Merchant | Paid with), the same
+/// height. `trailingWidth` fixes the second one's width; nil splits the row evenly.
+struct KFieldRow<Leading: View, Trailing: View>: View {
+    var trailingWidth: CGFloat? = 200
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            leading
+            if let trailingWidth { trailing.frame(width: trailingWidth) } else { trailing }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A `KField` holding a text field: Space Grotesk 15 Ink, the prompt Muted. `font` for numbers
+/// (`.mono(13)`), `axis: .vertical` for a note that grows up to `lines`.
+struct KTextField: View {
+    let label: String
+    @Binding var text: String
+    var prompt = ""
+    var font: Font = .grotesk(15)
+    var axis: Axis = .horizontal
+    var lines: ClosedRange<Int> = 1...1
+
+    @FocusState private var focused: Bool
+
+    init(_ label: String, text: Binding<String>, prompt: String = "", font: Font = .grotesk(15), axis: Axis = .horizontal, lines: ClosedRange<Int> = 1...1) {
+        self.label = label
+        self._text = text
+        self.prompt = prompt
+        self.font = font
+        self.axis = axis
+        self.lines = lines
+    }
+
+    var body: some View {
+        KField(label, focused: focused) {
+            TextField(label, text: $text, prompt: Text(prompt).foregroundStyle(Color.kMuted), axis: axis)
+                .labelsHidden()
+                .textFieldStyle(.plain)
+                .lineLimit(lines)
+                .font(font)
+                .foregroundStyle(Color.kInk)
+                .focused($focused)
+        }
+    }
+}
+
+/// A `KField` holding a date: typed in place, or picked from the calendar behind the icon.
+/// `latest` keeps it from going past a day (today, for things that already happened).
+struct KDateField: View {
+    let label: String
+    @Binding var selection: Date
+    var latest: Date?
+
+    @FocusState private var focused: Bool
+    @State private var calendar = false
+
+    init(_ label: String, selection: Binding<Date>, latest: Date? = nil) {
+        self.label = label
+        self._selection = selection
+        self.latest = latest
+    }
+
+    var body: some View {
+        KField(label, focused: focused) {
+            HStack(spacing: 8) {
+                picker.datePickerStyle(.field).font(.grotesk(15)).focused($focused)
+                Spacer(minLength: 0)
+                Button { calendar = true } label: {
+                    Image(systemName: "calendar").font(.system(size: 13)).foregroundStyle(Color.kMuted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Choose \(label.lowercased()) from a calendar")
+                .popover(isPresented: $calendar, arrowEdge: .bottom) {
+                    picker.datePickerStyle(.graphical).padding(12)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var picker: some View {
+        if let latest {
+            DatePicker(label, selection: $selection, in: ...latest, displayedComponents: .date).labelsHidden()
+        } else {
+            DatePicker(label, selection: $selection, displayedComponents: .date).labelsHidden()
+        }
+    }
+}
+
+/// A `KField` holding a choice: the chosen `value` and an up/down chevron, opening a menu of
+/// `options` (tagged views, as in a `Picker`). A nil `value` shows "Choose…" in Muted.
+struct KMenuField<Value: Hashable, Options: View>: View {
+    let label: String
+    @Binding var selection: Value
+    let value: String?
+    @ViewBuilder var options: Options
+
+    @FocusState private var focused: Bool
+
+    init(_ label: String, selection: Binding<Value>, value: String?, @ViewBuilder options: () -> Options) {
+        self.label = label
+        self._selection = selection
+        self.value = value
+        self.options = options()
+    }
+
+    var body: some View {
+        KField(label, focused: focused) {
+            Menu {
+                Picker(label, selection: $selection) { options }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(value ?? "Choose…")
+                        .font(.grotesk(15))
+                        .foregroundStyle(value == nil ? Color.kMuted : Color.kInk)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.kMuted)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .focused($focused)
+            .accessibilityLabel(label)
+            .accessibilityValue(value ?? "None chosen")
+        }
+    }
+}
+
 /// A hairline between rows.
 struct Hairline: View {
     var body: some View {

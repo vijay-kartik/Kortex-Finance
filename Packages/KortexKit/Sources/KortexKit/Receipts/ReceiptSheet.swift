@@ -103,8 +103,8 @@ struct ReceiptSheet: View {
 
     private var pickTotal: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Form {
-                Section {
+            fields {
+                SheetSection(header: "Which total did you pay?") {
                     Picker("Which total did you pay?", selection: $pickedTotal) {
                         ForEach(receipt.candidates, id: \.amountMinor) { c in
                             Text("\(Money.format(c.amountMinor)) · \(c.label)").tag(Int64?.some(c.amountMinor))
@@ -112,13 +112,14 @@ struct ReceiptSheet: View {
                         Text("Another amount").tag(Int64?.none)
                     }
                     .pickerStyle(.radioGroup)
+                    .labelsHidden()
+                    .font(.grotesk(13))
+                    .foregroundStyle(Color.kInk)
                     if pickedTotal == nil { AmountField(label: "Amount", text: $otherTotal) }
                 } footer: {
-                    Text("The total line wasn't clear, so pick the one you paid.").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                    Text("The total line wasn't clear, so pick the one you paid.")
                 }
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
             errorLine
             buttons(primary: ("Use this total", {
                 guard let total = pickedTotal ?? Money.parseMinor(otherTotal), total > 0 else { error = FinanceError.invalidAmount.message; return }
@@ -136,67 +137,80 @@ struct ReceiptSheet: View {
             .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
         let duplicate = duplicateDismissed ? nil : currentDuplicate
         return VStack(alignment: .leading, spacing: 0) {
-            Form {
+            fields {
                 if let duplicate { duplicateBanner(duplicate) }
-                Section {
-                    AmountField(label: "Total", text: $amount)
-                    TextField("Merchant", text: $merchant, prompt: Text("Whole Foods Market"))
-                        .onChange(of: merchant) { _, new in
-                            if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, in: finance.data) }
-                        }
-                    DatePicker("Date", selection: $date, in: ...Date(), displayedComponents: .date)
-                    AccountPicker(label: "Paid with", selection: $accountUid, accounts: accounts)
+                SheetSection {
+                    KFieldRow {
+                        AmountField(label: "Total", text: $amount)
+                    } trailing: {
+                        KDateField("Date", selection: $date, latest: Date())
+                    }
+                    KFieldRow {
+                        KTextField("Merchant", text: $merchant, prompt: "Whole Foods Market")
+                            .onChange(of: merchant) { _, new in
+                                if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, in: finance.data) }
+                            }
+                    } trailing: {
+                        AccountPicker(label: "Paid with", selection: $accountUid, accounts: accounts)
+                    }
                 } footer: {
                     if let last4 = unknownLast4, accountUid.isEmpty {
                         Text("The receipt shows a card ending \(last4), which isn't one of your cards. Pick how you paid, or add the card first.")
-                            .font(.grotesk(11)).foregroundStyle(Color.kAmber)
+                            .foregroundStyle(Color.kAmber)
                     } else if receipt.last4 != nil, unknownLast4 == nil {
-                        Label("Card ending \(receipt.last4!) on the receipt", systemImage: "checkmark").font(.grotesk(11)).foregroundStyle(Color.kGrowth)
+                        Label("Card ending \(receipt.last4!) on the receipt", systemImage: "checkmark").foregroundStyle(Color.kGrowth)
                     }
                 }
-                Section {
+                SheetSection(header: "Category") {
                     CategoryChips(selection: Binding(get: { categoryUid }, set: { categoryUid = $0; categoryTouched = true }),
                                   categories: categories, suggested: EntryRules.rememberedCategory(for: merchant, in: data))
-                } header: { Text("Category") }
+                }
                 if !receipt.items.isEmpty || receipt.taxMinor != nil {
-                    Section {
+                    SheetSection {
                         DisclosureGroup(isExpanded: $showsItems) {
                             ForEach(Array(receipt.items.enumerated()), id: \.offset) { _, item in
                                 LabeledContent(item.quantity > 1 ? "\(item.name) × \(item.quantity)" : item.name, value: Money.format(item.amountMinor))
                             }
                             if let tax = receipt.taxMinor { LabeledContent("Tax", value: Money.format(tax)) }
                         } label: {
-                            Text(itemSummary).font(.grotesk(13))
+                            Text(itemSummary).font(.grotesk(13)).foregroundStyle(Color.kInk)
                         }
+                        .font(.grotesk(13))
                     } footer: {
-                        Text("Line items are kept with the entry.").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                        Text("Line items are kept with the entry.")
                     }
                 }
-                Section {
-                    TextField("Note", text: $note, prompt: Text("Add a note"))
-                    Toggle("Keep the receipt image with this entry (on this Mac only)", isOn: $keepImage)
-                }
+                KTextField("Note", text: $note, prompt: "Add a note", font: .grotesk(14))
+                Toggle("Keep the receipt image with this entry (on this Mac only)", isOn: $keepImage)
+                    .font(.grotesk(13))
+                    .foregroundStyle(Color.kInk)
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
             errorLine
             buttons(primary: ("Save expense", save))
         }
     }
 
-    private func duplicateBanner(_ existing: Entry) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Looks like this was already added", systemImage: "doc.on.doc").font(.grotesk(14, .medium)).foregroundStyle(Color.kAmber)
-                Text("\(Money.format(existing.amountMinor)) at \(existing.merchant ?? "an expense") on \(EntryFormat.account(existing.accountUid, finance.data)), \(EntryFormat.when(existing)).")
-                    .font(.grotesk(12)).foregroundStyle(Color.kInk)
-                HStack {
-                    Button("Attach receipt to that entry") { attach(to: existing) }.buttonStyle(.kortexPrimary)
-                    Button("Add as a new entry") { duplicateDismissed = true }.buttonStyle(.kortexSecondary)
-                }
-            }
-            .padding(.vertical, 4)
+    /// The review's fields, scrolling between the title and the buttons.
+    private func fields<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) { content() }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 18)
         }
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    private func duplicateBanner(_ existing: Entry) -> some View {
+        KCard(padding: 14, spacing: 8) {
+            Label("Looks like this was already added", systemImage: "doc.on.doc").font(.grotesk(14, .medium)).foregroundStyle(Color.kAmber)
+            Text("\(Money.format(existing.amountMinor)) at \(existing.merchant ?? "an expense") on \(EntryFormat.account(existing.accountUid, finance.data)), \(EntryFormat.when(existing)).")
+                .font(.grotesk(12)).foregroundStyle(Color.kInk)
+            HStack {
+                Button("Attach receipt to that entry") { attach(to: existing) }.buttonStyle(.kortexPrimary)
+                Button("Add as a new entry") { duplicateDismissed = true }.buttonStyle(.kortexSecondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var errorLine: some View {
