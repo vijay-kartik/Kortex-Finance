@@ -106,8 +106,7 @@ struct EntrySheet: View {
         let all = data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let fromAccounts = type == .expense ? all : all.filter { $0.kind != .creditCard }
         let categoryKind: CategoryKind = type == .income ? .income : .expense
-        let categories = data.categories.values.filter { $0.kind == categoryKind }
-            .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
+        let categories = SpendCategory.listed(data.categories.values, kind: categoryKind)
         let suggested = EntryRules.rememberedCategory(for: merchant, in: data)
 
         SheetChrome(

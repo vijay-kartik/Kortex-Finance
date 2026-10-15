@@ -38,7 +38,7 @@ struct StatementRowsTable: View {
     var body: some View {
         let isCard = draft.account.kind == .creditCard
         let rows = draft.rows.filter(filter.admits)
-        let categories = Dictionary(grouping: data.categories.values.sorted { $0.name < $1.name }, by: \.kind)
+        let categories = Dictionary(grouping: SpendCategory.listed(data.categories.values), by: \.kind)
         let payFrom = data.accounts.values.filter { !$0.archived && !$0.kind.isCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let cards = data.accounts.values.filter { !$0.archived && $0.kind == .creditCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
         let mine = StatementImportRules.transferAccounts(into: draft.existingAccountUid, in: data)

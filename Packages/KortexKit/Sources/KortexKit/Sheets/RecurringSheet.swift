@@ -29,8 +29,7 @@ struct RecurringSheet: View {
     var body: some View {
         let data = finance.data
         let accounts = data.accounts.values.filter { !$0.archived }.sorted { $0.createdAtMillis < $1.createdAtMillis }
-        let categories = data.categories.values.filter { $0.kind == .expense }
-            .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder) < ($1.builtIn ? 0 : 1, $1.sortOrder) }
+        let categories = SpendCategory.listed(data.categories.values, kind: .expense)
         SheetChrome(
             title: editing == nil ? "Add recurring payment" : "Edit \(editing!.name)",
             primary: editing == nil ? "Save recurring payment" : "Save changes",

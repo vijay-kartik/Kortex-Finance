@@ -132,8 +132,7 @@ struct ReceiptSheet: View {
     private var review: some View {
         let data = finance.data
         let accounts = data.accounts.values.filter { !$0.archived }.sorted { ($0.kind.isCard ? 0 : 1, $0.createdAtMillis) < ($1.kind.isCard ? 0 : 1, $1.createdAtMillis) }
-        let categories = data.categories.values.filter { $0.kind == .expense }
-            .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
+        let categories = SpendCategory.listed(data.categories.values, kind: .expense)
         let duplicate = duplicateDismissed ? nil : currentDuplicate
         return VStack(alignment: .leading, spacing: 0) {
             Form {
