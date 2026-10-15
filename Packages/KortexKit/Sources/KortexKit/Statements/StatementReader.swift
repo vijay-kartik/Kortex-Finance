@@ -20,6 +20,8 @@ enum StatementReader {
         let gateway = try AIGateway()
         await progress(.rendering)
         let pages = try await Task.detached(priority: .userInitiated) { try render(file) }.value
+        // Rendering is detached, so it finishes even when the read is cancelled: send nothing then.
+        try Task.checkCancellation()
         let chunks = stride(from: 0, to: pages.count, by: pagesPerChunk).map { Array($0..<min($0 + pagesPerChunk, pages.count)) }
         await progress(.reading(done: 0, of: chunks.count))
 
