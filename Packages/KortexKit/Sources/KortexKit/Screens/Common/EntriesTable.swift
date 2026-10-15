@@ -123,8 +123,7 @@ private struct EntryMenu: View {
     /// A submenu of `kind`'s categories, ticking the one every entry in `current` is already in.
     private func categories(_ kind: CategoryKind, title: String, current: [Entry]) -> some View {
         let shared = Set(current.map(\.categoryUid)).count == 1 ? current.first?.categoryUid : nil
-        let list = data.categories.values.filter { $0.kind == kind }
-            .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
+        let list = SpendCategory.listed(data.categories.values, kind: kind)
         return Menu(title) {
             ForEach(list) { c in
                 Toggle(c.name, isOn: Binding(get: { shared == c.uid }, set: { _ in act(.setCategory(c.uid)) }))

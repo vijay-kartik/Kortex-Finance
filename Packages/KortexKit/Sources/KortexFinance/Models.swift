@@ -159,6 +159,15 @@ public struct Category: Sendable, Hashable, Identifiable {
     public var id: String { uid }
 }
 
+public extension Category {
+    /// How categories are listed everywhere: built-in first, then their sort order, then by name
+    /// (uid last, so equal names still come out the same way every time). `kind` keeps only that kind.
+    static func listed(_ all: some Sequence<Category>, kind: CategoryKind? = nil) -> [Category] {
+        all.filter { kind == nil || $0.kind == kind }
+            .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name, $0.uid) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name, $1.uid) }
+    }
+}
+
 /// The four categories every account starts with. Their uids are fixed and they are never synced,
 /// so each device supplies them itself.
 public enum BuiltInCategories {

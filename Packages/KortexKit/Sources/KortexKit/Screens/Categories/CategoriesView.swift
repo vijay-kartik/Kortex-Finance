@@ -30,7 +30,7 @@ struct CategoriesView: View {
         let (monthTotals, monthCounts) = Self.monthByCategory(txs, from: month.firstDay, to: today)
         let spentThisMonth = Spending.spentMinor(txs, from: month.firstDay, to: today)
         let incomeThisMonth = Spending.incomeMinor(txs, from: month.firstDay, to: today)
-        let all = data.categories.values.sorted { ($0.kind.rawValue, $0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.kind.rawValue, $1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
+        let all = SpendCategory.listed(data.categories.values)
         let groups: [(String, [SpendCategory])] = [
             ("EXPENSE · BUILT IN", all.filter { $0.kind == .expense && $0.builtIn }),
             ("EXPENSE · YOURS", all.filter { $0.kind == .expense && !$0.builtIn }),
