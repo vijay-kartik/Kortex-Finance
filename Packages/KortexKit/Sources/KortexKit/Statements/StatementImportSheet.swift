@@ -31,6 +31,9 @@ struct StatementImportSheet: View {
     /// The account it goes into was found by its last 4 digits rather than picked.
     @State private var foundByNumber = false
     @State private var summaries = ReviewSummaries()
+    /// Bumped by Try again. The read runs in `.task(id:)`, so a new attempt cancels the last one, and
+    /// closing the sheet cancels whichever is running: no more pages go to the model after Cancel.
+    @State private var attempt = 0
 
     private var model: AIModel { AIModel(rawValue: modelID) ?? .default }
 
@@ -50,7 +53,7 @@ struct StatementImportSheet: View {
         }
         .frame(width: 1180, height: 780)
         .background(Color.kSheet)
-        .task { await read() }
+        .task(id: attempt) { await read() }
     }
 
     private var title: String {
@@ -99,7 +102,7 @@ struct StatementImportSheet: View {
             Text(message).font(.grotesk(13)).foregroundStyle(Color.kMuted).multilineTextAlignment(.center).frame(maxWidth: 560)
             HStack {
                 if !AIKeyStore.hasKey { SettingsLink { Text("Open Settings…") } }
-                Button("Try again") { Task { await read() } }
+                Button("Try again") { attempt += 1 }
                 Button("Close", action: close).keyboardShortcut(.cancelAction)
             }
             .buttonStyle(.kortexSecondary)
@@ -450,7 +453,11 @@ struct StatementImportSheet: View {
         stage = .reading(.rendering)
         let categories = Array(finance.data.categories.values)
         do {
-            let read = try await StatementReader.read(file, categories: categories, model: model) { stage = .reading($0) }
+            let read = try await StatementReader.read(file, categories: categories, model: model) { progress in
+                if !Task.isCancelled { stage = .reading(progress) }
+            }
+            // Cancelled (closed, or tried again): this read no longer owns the sheet.
+            guard !Task.isCancelled else { return }
             statement = read
             let usable = read.accounts.filter { $0.kind == .bank || $0.kind == .credit_card }
             // From an account's Import statement…, go straight to the statement's account of that kind.
@@ -465,6 +472,7 @@ struct StatementImportSheet: View {
                 stage = .pickAccount(read.accounts)
             }
         } catch {
+            guard !Task.isCancelled else { return }
             stage = .failed(error.localizedDescription)
         }
     }
