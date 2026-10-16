@@ -18,7 +18,7 @@ struct PendingView: View {
         let data = finance.data
         let today = LocalDay.today()
         let txs = Array(data.transactions.values)
-        let summary = Pending.summary(today: today, statements: Array(data.statements.values), recurring: Array(data.recurring.values), transactions: txs)
+        let summary = data.pendingSummary(today: today)
         let items = summary.items.filter { item in
             switch filter {
             case .all: true

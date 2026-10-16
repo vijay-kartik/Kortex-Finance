@@ -9,6 +9,8 @@ public struct FinanceData: Sendable {
     public var merchants: [String: Merchant] = [:]
     /// Rebuilt whenever accounts or transactions change: a debit card's link moves its spends between ledgers.
     public private(set) var ledgers = LedgerIndex()
+    /// Rebuilt whenever transactions change, so Pending payments doesn't scan them on every render.
+    public private(set) var payments = PendingPayments()
 
     public init() {}
 
@@ -20,6 +22,7 @@ public struct FinanceData: Sendable {
     public mutating func apply(_ rows: [RemoteRow<Transaction>]) {
         Self.merge(rows, into: &transactions)
         ledgers = LedgerIndex(transactions: transactions.values, accounts: accounts)
+        payments = PendingPayments(transactions: transactions.values)
     }
     public mutating func apply(_ rows: [RemoteRow<Recurring>]) { Self.merge(rows, into: &recurring) }
     public mutating func apply(_ rows: [RemoteRow<CardStatement>]) { Self.merge(rows, into: &statements) }
@@ -108,6 +111,11 @@ public struct FinanceData: Sendable {
     /// The day of the latest entry on the account's ledger, opening entries aside.
     public func lastEntryOn(of account: Account) -> LocalDay? {
         ledgers.lastEntryOn(Balances.ledger(of: account.uid, in: accounts))
+    }
+
+    /// Pending payments as of `today`, from `payments` rather than a scan of the transactions.
+    public func pendingSummary(today: LocalDay) -> PendingSummary {
+        Pending.summary(today: today, statements: statements.values, recurring: recurring.values, payments: payments)
     }
 
     /// Newest first, by day and then by time.
