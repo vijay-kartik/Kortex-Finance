@@ -244,12 +244,7 @@ private struct MatchChip: View {
         case .some(let m) where m.sure: ("Already there", .kMuted)
         case .some: ("Maybe there", .kAmber)
         }
-        Text(text)
-            .font(.grotesk(11, .medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.14), in: Capsule())
+        KPill(text, color: color)
             .help(help)
     }
 

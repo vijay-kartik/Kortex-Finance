@@ -232,6 +232,87 @@ struct KSegmented<Value: Hashable>: View {
     }
 }
 
+/// The Figma status pill (Mac · Credit cards: the statement STATUS column and the due badge): radius 6,
+/// the status colour at 12% behind a label in that colour, Space Grotesk regular, no stroke.
+/// `systemImage` goes before the label ("checkmark" on a paid statement, "bell" on the due badge), so
+/// the status isn't told by colour alone.
+struct KPill: View {
+    enum Size {
+        /// Table cells: 11pt, padding 8/3, 4pt between icon and label.
+        case regular
+        /// A card header's badge: 12pt, padding 8/4, 6pt between icon and label.
+        case large
+
+        var fontSize: CGFloat {
+            switch self {
+            case .regular: 11
+            case .large: 12
+            }
+        }
+
+        var verticalPadding: CGFloat {
+            switch self {
+            case .regular: 3
+            case .large: 4
+            }
+        }
+
+        var iconSpacing: CGFloat {
+            switch self {
+            case .regular: 4
+            case .large: 6
+            }
+        }
+    }
+
+    let title: String
+    let color: Color
+    var size: Size = .regular
+    var systemImage: String?
+
+    init(_ title: String, color: Color, size: Size = .regular, systemImage: String? = nil) {
+        self.title = title
+        self.color = color
+        self.size = size
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        HStack(spacing: size.iconSpacing) {
+            if let systemImage {
+                Image(systemName: systemImage).font(.system(size: size.fontSize)).accessibilityHidden(true)
+            }
+            Text(title).font(.grotesk(size.fontSize))
+        }
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, size.verticalPadding)
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// The Figma header tag (Mac · Receipt — review "FROM RECEIPT", Mac · Paste SMS — review "FROM SMS"):
+/// a section label (JetBrains Mono 10, tracking 1.2) on Raised with an Edge hairline, radius 6,
+/// padding 8/3.
+struct KTag: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 6)
+        Text(title).sectionLabelStyle()
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.kRaised, in: shape)
+            .overlay(shape.strokeBorder(Color.kEdge))
+    }
+}
+
 /// A hairline between rows.
 struct Hairline: View {
     var body: some View {

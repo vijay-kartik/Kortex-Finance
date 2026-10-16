@@ -126,12 +126,8 @@ struct CardDetail: View {
                 Spacer()
                 if unpaid > 0, let days = daysToDue {
                     let overdue = days < 0
-                    Label(overdue ? "Overdue by \(-days) day\(days == -1 ? "" : "s")" : days == 0 ? "Due today" : "Due in \(days) day\(days == 1 ? "" : "s")",
-                          systemImage: "bell")
-                        .font(.grotesk(12))
-                        .foregroundStyle(overdue ? Color.kAlarm : Color.kAmber)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background((overdue ? Color.kAlarm : Color.kAmber).opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                    KPill(overdue ? "Overdue by \(-days) day\(days == -1 ? "" : "s")" : days == 0 ? "Due today" : "Due in \(days) day\(days == 1 ? "" : "s")",
+                          color: overdue ? .kAlarm : .kAmber, size: .large, systemImage: "bell")
                 }
             }
             HStack(alignment: .top, spacing: 32) {
@@ -223,17 +219,13 @@ struct CardDetail: View {
     }
 
     private func statusChip(_ s: CardStatement, txs: [Entry], today: LocalDay) -> some View {
-        let (text, color): (String, Color) = switch Statements.status(s, txs, today: today) {
-        case .paid: (Statements.paidOn(s, txs).map { "Paid \($0.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "Paid", .kGrowth)
-        case .partlyPaid: ("Part paid", .kAmber)
-        case .overdue: ("Overdue", .kAlarm)
-        case .due: ("Unpaid", .kAmber)
+        let (text, color, icon): (String, Color, String?) = switch Statements.status(s, txs, today: today) {
+        case .paid: (Statements.paidOn(s, txs).map { "Paid \($0.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "Paid", .kGrowth, "checkmark")
+        case .partlyPaid: ("Part paid", .kAmber, nil)
+        case .overdue: ("Overdue", .kAlarm, nil)
+        case .due: ("Unpaid", .kAmber, nil)
         }
-        return Text(text)
-            .font(.grotesk(11))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+        return KPill(text, color: color, systemImage: icon)
     }
 
     // MARK: Debit

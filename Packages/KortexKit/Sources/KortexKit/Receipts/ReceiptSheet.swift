@@ -39,9 +39,7 @@ struct ReceiptSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
                     Text("Add expense").font(.grotesk(20, .medium)).foregroundStyle(Color.kInk)
-                    Text("FROM RECEIPT").sectionLabelStyle()
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.kRaised, in: RoundedRectangle(cornerRadius: 6))
+                    KTag("FROM RECEIPT")
                 }
                 .padding(.horizontal, 24).padding(.top, 22)
                 content
