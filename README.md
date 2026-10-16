@@ -61,7 +61,9 @@ concealed and transient types so clipboard managers don't record it, and clears 
 unless something else has been copied since (`KortexKit.SensitivePasteboard`).
 
 The data key comes from the `financeKey` function, which enforces App Check, and is then kept in the
-Keychain (`KortexCloud.FinanceKeys`). App Attest needs a paid Apple Developer membership, so the Mac
+data protection Keychain (`KortexCloud.FinanceKeys`). Sign Out deletes that key and clears Firestore's
+on-disk cache (`Cloud.clearFirestore`), so neither the documents nor the key that opens `finSecrets`
+stay on this Mac; the next sign-in fetches both again. App Attest needs a paid Apple Developer membership, so the Mac
 uses App Check's debug provider: Settings › Account Numbers shows this Mac's token, which is added
 once in Firebase › App Check › Apps › dev.kortex.mac › Manage debug tokens. For a build shared with
 others, switch `Cloud.configure()` to `AppAttestProviderFactory` and add the App Attest entitlement.
