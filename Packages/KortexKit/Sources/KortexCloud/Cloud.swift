@@ -14,15 +14,33 @@ public enum Cloud {
         // (Settings › Account Numbers shows it). Switch to AppAttestProviderFactory for a shared build.
         AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
         FirebaseApp.configure()
-
-        let settings = Firestore.firestore().settings
-        // Firestore's on-disk cache is the Mac's local copy: it shows the last synced data offline.
-        settings.cacheSettings = PersistentCacheSettings()
-        Firestore.firestore().settings = settings
+        setUpFirestore()
 
         if let clientID = FirebaseApp.app()?.options.clientID {
             GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
         }
+    }
+
+    /// Settings for a new Firestore instance, before anything uses it.
+    @MainActor private static func setUpFirestore() {
+        let settings = Firestore.firestore().settings
+        // Firestore's on-disk cache is the Mac's local copy: it shows the last synced data offline.
+        settings.cacheSettings = PersistentCacheSettings()
+        Firestore.firestore().settings = settings
+    }
+
+    /// Deletes Firestore's on-disk cache, at sign-out, so the signed-out user's documents don't stay on
+    /// this Mac. Call once nothing is listening; the next sign-in syncs from the server into a new cache.
+    @MainActor static func clearFirestore() async {
+        let db = Firestore.firestore()
+        do {
+            try await db.terminate()
+            try await db.clearPersistence()
+        } catch {
+            assertionFailure("Couldn't clear Firestore's cache: \(error)")
+        }
+        // Firestore.firestore() now makes a new instance, which takes settings only before first use.
+        setUpFirestore()
     }
 
     /// This Mac's App Check debug token, made on first launch and kept in its defaults. Registered in

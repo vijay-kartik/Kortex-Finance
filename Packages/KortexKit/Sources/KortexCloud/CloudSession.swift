@@ -36,6 +36,8 @@ public final class CloudSession {
     public let finance = FinanceSync()
 
     @ObservationIgnored private var authListener: AuthStateDidChangeListenerHandle?
+    /// The last sign-out's cache clearing, which the next sign-in waits for.
+    @ObservationIgnored private var clearing: Task<Void, Never>?
 
     public init() {}
 
@@ -57,6 +59,8 @@ public final class CloudSession {
         guard let window = NSApp.keyWindow ?? NSApp.windows.first else { return }
         signInError = nil
         state = .signingIn
+        // Firestore can't be used while its cache is being cleared.
+        await clearing?.value
         do {
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: window)
             guard let idToken = result.user.idToken?.tokenString else {
@@ -74,9 +78,17 @@ public final class CloudSession {
         }
     }
 
+    /// Signs out and takes the user's finances off this Mac: the data key from the Keychain and the
+    /// synced documents (finSecrets read by Show included) from Firestore's cache. Receipt images stay
+    /// in the user's own folder.
     public func signOut() {
+        let uid = Auth.auth().currentUser?.uid
         GIDSignIn.sharedInstance.signOut()
-        try? Auth.auth().signOut()
+        do { try Auth.auth().signOut() } catch { return }
+        // The auth listener stops sync too, but later; nothing may listen while the cache is cleared.
+        finance.stop()
+        if let uid { FinanceKeys.forget(uid) }
+        clearing = Task { await Cloud.clearFirestore() }
     }
 
     private func authChanged(_ firebaseUser: User?) {

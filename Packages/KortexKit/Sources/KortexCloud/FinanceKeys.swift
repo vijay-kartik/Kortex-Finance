@@ -12,14 +12,20 @@ public enum FinanceKeys {
     public static func key(for userUid: String) async throws -> DataKey {
         if let stored = stored(userUid) { return stored }
         let fetched = try await fetch(userUid)
-        store(fetched)
+        try store(fetched)
         return fetched
     }
 
     /// Fetches from the server even when a key is kept, to check this Mac passes App Check.
     public static func check() async throws {
         guard let uid = Auth.auth().currentUser?.uid else { throw FinanceKeyError.signedOut }
-        store(try await fetch(uid))
+        try store(try await fetch(uid))
+    }
+
+    /// Removes the user's key from this Mac, at sign-out. The next sign-in fetches it again.
+    public static func forget(_ userUid: String) {
+        SecItemDelete(query(userUid) as CFDictionary)
+        SecItemDelete(legacyQuery(userUid) as CFDictionary)
     }
 
     private static func fetch(_ userUid: String) async throws -> DataKey {
@@ -45,26 +51,39 @@ public enum FinanceKeys {
 
     private static let service = "dev.kortex.mac.finance-key"
 
+    /// The data protection keychain: the only one on macOS that applies `WhenUnlockedThisDeviceOnly`.
+    private static func query(_ userUid: String) -> [CFString: Any] {
+        var query = legacyQuery(userUid)
+        query[kSecUseDataProtectionKeychain] = true
+        return query
+    }
+
+    /// The file keychain, where earlier builds kept the key.
+    private static func legacyQuery(_ userUid: String) -> [CFString: Any] {
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: userUid]
+    }
+
     /// "version:base64", one item per user.
     private static func stored(_ userUid: String) -> DataKey? {
         var item: CFTypeRef?
-        let status = SecItemCopyMatching([
-            kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: userUid,
-            kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
-        ] as CFDictionary, &item)
+        var query = query(userUid)
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess, let data = item as? Data, let text = String(data: data, encoding: .utf8) else { return nil }
         let parts = text.split(separator: ":", maxSplits: 1)
         guard parts.count == 2, let version = Int(parts[0]), let bytes = Data(base64Encoded: String(parts[1])) else { return nil }
         return DataKey(userUid: userUid, bytes: bytes, version: version)
     }
 
-    private static func store(_ key: DataKey) {
-        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key.userUid]
-        SecItemDelete(query as CFDictionary)
-        var add = query
+    /// Replaces any kept key, an earlier build's file-keychain item included.
+    private static func store(_ key: DataKey) throws {
+        forget(key.userUid)
+        var add = query(key.userUid)
         add[kSecValueData] = Data("\(key.version):\(key.bytes.base64EncodedString())".utf8)
         add[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        SecItemAdd(add as CFDictionary, nil)
+        let status = SecItemAdd(add as CFDictionary, nil)
+        guard status == errSecSuccess else { throw FinanceKeyError.notKept(status) }
     }
 }
 
@@ -74,6 +93,8 @@ public enum FinanceKeyError: LocalizedError {
     case refused
     case offline
     case unreadable
+    /// The Keychain refused to keep the key; the OSStatus it returned.
+    case notKept(OSStatus)
 
     public var errorDescription: String? {
         switch self {
@@ -81,6 +102,7 @@ public enum FinanceKeyError: LocalizedError {
         case .refused: "Firebase didn't accept this Mac. Register its App Check debug token in Settings › Account Numbers."
         case .offline: "Couldn't reach Kortex's server. Check your connection and try again."
         case .unreadable: "The server's answer couldn't be read."
+        case .notKept(let status): "This Mac's Keychain didn't keep the data key (error \(status))."
         }
     }
 }
