@@ -66,6 +66,14 @@ uses App Check's debug provider: Settings › Account Numbers shows this Mac's t
 once in Firebase › App Check › Apps › dev.kortex.mac › Manage debug tokens. For a build shared with
 others, switch `Cloud.configure()` to `AppAttestProviderFactory` and add the App Attest entitlement.
 
+## Budgets
+
+`finBudgets/{categoryUid}` holds one monthly amount per expense category, built-in ones included, and is
+listened to like the other `fin*` collections. `KortexFinance.Budgets` ports the phone's `calc/Budgets.kt`:
+Categories shows "₹5,400 of ₹8,000 this month" for each budgeted category, and the Dashboard warns when a
+category is on track to go over at this month's pace. A budget is set or cleared in the category sheet
+(right-click › Set budget… on a built-in one) through `BudgetRules`, ported from `SetBudget` / `ClearBudget`.
+
 ## Reset data
 
 The account menu at the bottom of the sidebar has Reset Data…, which erases everything and keeps you

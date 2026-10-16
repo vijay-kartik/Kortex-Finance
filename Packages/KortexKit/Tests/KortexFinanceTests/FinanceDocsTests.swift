@@ -69,6 +69,24 @@ struct FinanceDocsTests {
         }
     }
 
+    /// As `remoteBudget`: built-in categories' budgets too, and only amounts above zero.
+    @Test func readsABudgetAsAndroidWritesIt() {
+        let doc: [String: Any] = ["amountMinor": NSNumber(value: 8_000_00), "updatedAt": NSNumber(value: 7 as Int64), "deleted": false]
+        #expect(FinanceDocs.budget(uid: "food", doc) == .live(Budget(categoryUid: "food", amountMinor: 8_000_00, createdAtMillis: 7, updatedAtMillis: 7)))
+        for amount: Any in [0, -5, "800"] {
+            var bad = doc
+            bad["amountMinor"] = amount
+            #expect(FinanceDocs.budget(uid: "food", bad) == nil, "amountMinor \(amount)")
+        }
+        #expect(FinanceDocs.budget(uid: "food", ["updatedAt": NSNumber(value: 9), "deleted": true]) == .deleted(uid: "food"))
+
+        var data = FinanceData()
+        data.apply([FinanceDocs.budget(uid: "food", doc)!])
+        #expect(data.budgets["food"]?.amountMinor == 8_000_00)
+        data.apply([FinanceDocs.budget(uid: "food", ["updatedAt": NSNumber(value: 9), "deleted": true])!])
+        #expect(data.budgets.isEmpty, "a delete marker removes it")
+    }
+
     @Test func syncedCategoriesNeverReplaceBuiltIns() {
         var data = FinanceData()
         data.apply([

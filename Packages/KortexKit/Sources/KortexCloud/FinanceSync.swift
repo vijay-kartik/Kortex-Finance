@@ -23,7 +23,7 @@ public final class FinanceSync: FinanceStore {
     /// The signed-in user's receipt images on this Mac.
     @ObservationIgnored public private(set) var receipts: any ReceiptFiles = ReceiptFolder(userUid: nil)
 
-    private static let collections = ["finCategories", "finAccounts", "finStatements", "finRecurring", "finMerchants", "finTransactions"]
+    private static let collections = ["finCategories", "finBudgets", "finAccounts","finStatements", "finRecurring", "finMerchants", "finTransactions"]
 
     public init() {}
 
@@ -122,8 +122,8 @@ public final class FinanceSync: FinanceStore {
         return number
     }
 
-    /// Reset data: marks every finance document deleted, finSecrets and finBudgets included (which
-    /// aren't listened to), so the phone erases them too on its next sync. Reads from the server when it can be reached.
+    /// Reset data: marks every finance document deleted, finSecrets (which isn't listened to) and
+    /// finBudgets included, so the phone erases them too on its next sync. Reads from the server when it can be reached.
     /// This user's receipt images go too, including those earlier builds kept outside their folder.
     public func eraseAll() async throws {
         guard let uid = userUid else { return }
@@ -178,6 +178,7 @@ public final class FinanceSync: FinanceStore {
         }
         switch collection {
         case "finCategories": data.apply(rows(FinanceDocs.category))
+        case "finBudgets": data.apply(rows(FinanceDocs.budget))
         case "finAccounts": data.apply(rows(FinanceDocs.account))
         case "finStatements": data.apply(rows(FinanceDocs.statement))
         case "finRecurring": data.apply(rows(FinanceDocs.recurring))

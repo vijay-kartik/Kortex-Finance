@@ -18,6 +18,7 @@ public enum FinanceDocWriter {
         case .recurring(let r): Document(collection: .recurring, uid: r.uid, fields: recurring(r, serverTime))
         case .statement(let s): Document(collection: .statements, uid: s.uid, fields: statement(s, serverTime))
         case .merchant(let m): Document(collection: .merchants, uid: m.uid, fields: merchant(m, serverTime))
+        case .budget(let b): Document(collection: .budgets, uid: b.categoryUid, fields: budget(b, serverTime))
         case .secret(let uid, let sealed, let at): Document(collection: .secrets, uid: uid, fields: secret(sealed, at, serverTime))
         case .delete(let collection, let uid, let at):
             // Merged over the document; the rest of its fields stay for whoever still has it.
@@ -85,6 +86,11 @@ public enum FinanceDocWriter {
     static func category(_ c: Category, _ serverTime: Any) -> [String: Any] {
         ["name": c.name, "kind": c.kind.rawValue, "colorToken": c.colorToken, "sortOrder": c.sortOrder]
             .merging(meta(c.createdAtMillis, c.updatedAtMillis, serverTime)) { $1 }
+    }
+
+    /// Under the category's uid, as `budgetDoc`.
+    static func budget(_ b: Budget, _ serverTime: Any) -> [String: Any] {
+        ["amountMinor": b.amountMinor].merging(meta(b.createdAtMillis, b.updatedAtMillis, serverTime)) { $1 }
     }
 
     static func recurring(_ r: Recurring, _ serverTime: Any) -> [String: Any] {

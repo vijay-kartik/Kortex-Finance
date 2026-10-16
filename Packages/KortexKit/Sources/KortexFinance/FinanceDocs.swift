@@ -89,6 +89,14 @@ public enum FinanceDocs {
         }
     }
 
+    /// `finBudgets/{categoryUid}`, as `remoteBudget`.
+    public static func budget(uid: String, _ d: Fields) -> RemoteRow<Budget>? {
+        read(uid, d) { updatedAt in
+            guard let amount = d.long("amountMinor"), amount > 0 else { return nil }
+            return Budget(categoryUid: uid, amountMinor: amount, createdAtMillis: d.long("createdAt") ?? updatedAt, updatedAtMillis: updatedAt)
+        }
+    }
+
     public static func recurring(uid: String, _ d: Fields) -> RemoteRow<Recurring>? {
         read(uid, d) { updatedAt in
             guard let name = d.text("name"),

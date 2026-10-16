@@ -466,6 +466,34 @@ struct WriteRulesTests {
         let delete = FinanceDocWriter.document(.delete(.transactions, uid: "t", atMillis: 5), serverTime: "SERVER")
         #expect(delete.fields["deleted"] as? Bool == true && delete.fields.count == 3)
     }
+
+    /// As kortex's SetBudget / ClearBudget, and `budgetDoc` under the category's uid.
+    @Test func budgetsAreForExpenseCategoriesAndReadBack() throws {
+        var data = sample()
+        #expect(BudgetRules.set("food", amountMinor: 0, in: data, clock: clock).failure == .invalidAmount)
+        #expect(BudgetRules.set("salary", amountMinor: 1_000_00, in: data, clock: clock).failure == .wrongCategoryKind)
+        #expect(BudgetRules.set("gone", amountMinor: 1_000_00, in: data, clock: clock).failure == .notFound)
+        #expect(writes(BudgetRules.clear("food", in: data, clock: clock)).isEmpty, "nothing to clear")
+
+        let set = try BudgetRules.set("food", amountMinor: 4_000_00, in: data, clock: clock).get()
+        guard case .budget(let b) = set.writes.first else { Issue.record("\(set.writes)"); return }
+        #expect(b.categoryUid == "food" && b.amountMinor == 4_000_00 && b.createdAtMillis == clock.nowMillis)
+        let doc = FinanceDocWriter.document(.budget(b), serverTime: "SERVER")
+        #expect(doc.collection == .budgets && doc.uid == "food")
+        #expect(Set(doc.fields.keys) == ["amountMinor", "createdAt", "updatedAt", "serverUpdatedAt", "deleted"])
+        if case .live(let read) = FinanceDocs.budget(uid: "food", doc.fields) { #expect(read == b) } else { Issue.record("didn't read back") }
+
+        data.apply(set)
+        #expect(data.budgets["food"]?.amountMinor == 4_000_00)
+        let later = FinanceClock(nowMillis: clock.nowMillis + 1_000, zone: clock.zone)
+        guard case .budget(let changed) = writes(BudgetRules.set("food", amountMinor: 5_000_00, in: data, clock: later)).first else { Issue.record("no budget"); return }
+        #expect(changed.createdAtMillis == clock.nowMillis && changed.updatedAtMillis == later.nowMillis, "a changed amount keeps its creation time")
+
+        let cleared = try BudgetRules.clear("food", in: data, clock: clock).get()
+        guard case .delete(.budgets, "food", _) = cleared.writes.first else { Issue.record("\(cleared.writes)"); return }
+        data.apply(cleared)
+        #expect(data.budgets["food"] == nil)
+    }
 }
 
 private extension Result {

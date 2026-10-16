@@ -183,8 +183,8 @@ public enum CategoryRules {
 
     /// Deleting never deletes entries: they, recurring payments and remembered merchants move to
     /// `moveTo`, or to Uncategorised when it's nil. Its budget is deleted too, as the phone does: a
-    /// phone that pulls the category's marker deletes only the category. Budgets aren't read here, so
-    /// the marker is written either way; over a missing document it's only a tombstone.
+    /// phone that pulls the category's marker deletes only the category. The marker is written even
+    /// when no budget has synced here; over a missing document it's only a tombstone.
     public static func delete(_ uid: String, moveTo: String?, in data: FinanceData, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
         guard let c = data.categories[uid] else { return .failure(.notFound) }
         guard !c.builtIn else { return .failure(.builtIn) }
@@ -209,5 +209,28 @@ public enum CategoryRules {
         writes.append(.delete(.budgets, uid: uid, atMillis: now))
         writes.append(.delete(.categories, uid: uid, atMillis: now))
         return .success(Change(writes))
+    }
+}
+
+/// Category budgets, as kortex's usecase/Budgets.kt: one standing monthly amount per expense category,
+/// built-in or yours.
+public enum BudgetRules {
+    /// Sets or changes a category's budget. A budget is more than nothing; clearing it is how to stop
+    /// budgeting a category. A changed amount keeps its creation time.
+    public static func set(_ categoryUid: String, amountMinor: Int64, in data: FinanceData, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
+        guard amountMinor > 0 else { return .failure(.invalidAmount) }
+        guard let c = data.categories[categoryUid] else { return .failure(.notFound) }
+        guard c.kind == .expense else { return .failure(.wrongCategoryKind) }
+        let now = clock.nowMillis
+        let b = Budget(categoryUid: categoryUid, amountMinor: amountMinor,
+                       createdAtMillis: data.budgets[categoryUid]?.createdAtMillis ?? now, updatedAtMillis: now)
+        return .success(Change([.budget(b)]))
+    }
+
+    /// The category is no longer budgeted; when none is, the month isn't either. Nothing to write
+    /// when it has no budget.
+    public static func clear(_ categoryUid: String, in data: FinanceData, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
+        guard data.budgets[categoryUid] != nil else { return .success(Change([])) }
+        return .success(Change([.delete(.budgets, uid: categoryUid, atMillis: clock.nowMillis)]))
     }
 }
