@@ -26,6 +26,9 @@ public struct DashboardModel: Sendable {
     public let pace: Pace?
     public let shares: [CategoryShare]
     public let recent: [Transaction]
+    /// The category whose projection goes furthest over its budget, at the Pace card's pace: "Food is
+    /// on track to go ₹1,200 over budget." Nil when none is on track to.
+    public let overBudget: CategoryBudget?
 
     public var currentFlow: MonthFlow { flows[flows.count - 1] }
     public var leftAfterPendingMinor: Int64 { totalBalanceMinor - pending.totalMinor }
@@ -57,5 +60,7 @@ public struct DashboardModel: Sendable {
             : nil
         shares = Spending.whereItWent(txs, categories: data.categories, from: month.firstDay, to: today)
         recent = Array(data.transactionsNewestFirst.lazy.filter { $0.type != .opening }.prefix(5))
+        overBudget = Budgets.status(data, month: month, today: today).categories.filter { $0.projectedMinor > $0.budgetMinor }
+            .max { $0.projectedMinor - $0.budgetMinor < $1.projectedMinor - $1.budgetMinor }
     }
 }

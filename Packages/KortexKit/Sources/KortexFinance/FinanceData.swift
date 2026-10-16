@@ -7,6 +7,8 @@ public struct FinanceData: Sendable {
     public var recurring: [String: Recurring] = [:]
     public var statements: [String: CardStatement] = [:]
     public var merchants: [String: Merchant] = [:]
+    /// By category uid, built-in categories' too.
+    public var budgets: [String: Budget] = [:]
     /// Rebuilt whenever accounts or transactions change: a debit card's link moves its spends between ledgers.
     public private(set) var ledgers = LedgerIndex()
 
@@ -24,6 +26,7 @@ public struct FinanceData: Sendable {
     public mutating func apply(_ rows: [RemoteRow<Recurring>]) { Self.merge(rows, into: &recurring) }
     public mutating func apply(_ rows: [RemoteRow<CardStatement>]) { Self.merge(rows, into: &statements) }
     public mutating func apply(_ rows: [RemoteRow<Merchant>]) { Self.merge(rows, into: &merchants) }
+    public mutating func apply(_ rows: [RemoteRow<Budget>]) { Self.merge(rows, into: &budgets) }
 
     /// A synced category can't replace or delete a built-in one: built-ins are fixed on every device.
     public mutating func apply(_ rows: [RemoteRow<Category>]) {
@@ -37,10 +40,11 @@ public struct FinanceData: Sendable {
     }
 
     /// A change as its documents would come back through the listeners, without the round trip.
-    /// Secrets and budgets aren't part of the data and are skipped.
+    /// Secrets aren't part of the data and are skipped.
     public mutating func apply(_ change: Change) {
         var accounts: [RemoteRow<Account>] = [], transactions: [RemoteRow<Transaction>] = [], categories: [RemoteRow<Category>] = []
         var recurring: [RemoteRow<Recurring>] = [], statements: [RemoteRow<CardStatement>] = [], merchants: [RemoteRow<Merchant>] = []
+        var budgets: [RemoteRow<Budget>] = []
         for write in change.writes {
             switch write {
             case .account(let a): accounts.append(.live(a))
@@ -49,6 +53,7 @@ public struct FinanceData: Sendable {
             case .recurring(let r): recurring.append(.live(r))
             case .statement(let s): statements.append(.live(s))
             case .merchant(let m): merchants.append(.live(m))
+            case .budget(let b): budgets.append(.live(b))
             case .secret: break
             case .delete(let collection, let uid, _):
                 switch collection {
@@ -58,11 +63,13 @@ public struct FinanceData: Sendable {
                 case .recurring: recurring.append(.deleted(uid: uid))
                 case .statements: statements.append(.deleted(uid: uid))
                 case .merchants: merchants.append(.deleted(uid: uid))
-                case .secrets, .budgets: break
+                case .budgets: budgets.append(.deleted(uid: uid))
+                case .secrets: break
                 }
             }
         }
         if !categories.isEmpty { apply(categories) }
+        if !budgets.isEmpty { apply(budgets) }
         if !accounts.isEmpty { apply(accounts) }
         if !statements.isEmpty { apply(statements) }
         if !recurring.isEmpty { apply(recurring) }

@@ -18,6 +18,7 @@ struct DashboardView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 16) {
+                        if let over = model.overBudget { overBudget(over) }
                         kpis(model)
                         equalHeightRow {
                             CashFlowCard(flows: model.flows)
@@ -64,6 +65,25 @@ struct DashboardView: View {
                     sub: spentLine.0, subColor: spentLine.1)
             KPITile(label: "KEPT THIS MONTH", value: m.keptPercent.map { "\($0)%" } ?? "—", sub: keptLine.0, subColor: keptLine.1)
         }
+    }
+
+    /// The phone's over-budget insight: "Food is on track to go ₹1,200 over budget." Opens Categories,
+    /// where budgets are set.
+    private func overBudget(_ over: CategoryBudget) -> some View {
+        let amount = Money.format(over.projectedMinor - over.budgetMinor, wholeUnits: true)
+        return Button { go(.categories) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(Color.kAmber)
+                (Text("\(over.name) is on track to go ") + Text("\(amount) over").foregroundColor(.kAmber) + Text(" budget."))
+                    .font(.grotesk(13)).foregroundStyle(Color.kInk)
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(Color.kMuted)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .panelSurface()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func equalHeightRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

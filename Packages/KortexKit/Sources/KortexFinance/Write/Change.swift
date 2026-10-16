@@ -7,8 +7,7 @@ public enum FinCollection: String, Sendable, CaseIterable {
     case merchants = "finMerchants"
     case transactions = "finTransactions"
     case secrets = "finSecrets"
-    /// `finBudgets/{categoryUid}`, the phone's monthly budgets. Not read here; only erased with
-    /// their category, or by a reset.
+    /// `finBudgets/{categoryUid}`, monthly category budgets, erased with their category or by a reset.
     case budgets = "finBudgets"
 }
 
@@ -20,6 +19,7 @@ public enum RecordWrite: Sendable {
     case recurring(Recurring)
     case statement(CardStatement)
     case merchant(Merchant)
+    case budget(Budget)
     /// An account's full number, sealed. Written alongside the account, which carries `hasSecret`.
     case secret(accountUid: String, SealedSecret, atMillis: Int64)
     /// Android merges `deleted: true` over a record's document rather than removing it.

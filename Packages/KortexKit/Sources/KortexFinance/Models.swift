@@ -170,6 +170,17 @@ public enum BuiltInCategories {
     public static let all: [Category] = [food, travel, utilities, salary]
 }
 
+/// One expense category's standing monthly amount, under the category's uid (built-in ones too). No
+/// budget means the category isn't budgeted; the month's overall budget is the sum of them.
+public struct Budget: Sendable, Hashable, Identifiable {
+    public let categoryUid: String
+    public var amountMinor: Int64
+    public var createdAtMillis: Int64
+    public var updatedAtMillis: Int64
+
+    public var id: String { categoryUid }
+}
+
 /// A subscription or fixed expense. `nextDueOn` is the first occurrence not yet paid or skipped.
 public struct Recurring: Sendable, Hashable, Identifiable {
     public let uid: String
