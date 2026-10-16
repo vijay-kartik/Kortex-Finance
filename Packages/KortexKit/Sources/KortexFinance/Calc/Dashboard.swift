@@ -43,7 +43,7 @@ public struct DashboardModel: Sendable {
         hasAccounts = !data.accounts.isEmpty
         totalBalanceMinor = data.totalBalanceMinor
         accountCount = data.accounts.values.filter { $0.kind.countsInTotal && !$0.archived }.count
-        pending = Pending.summary(today: today, statements: Array(data.statements.values), recurring: Array(data.recurring.values), transactions: txs)
+        pending = data.pendingSummary(today: today)
         self.flows = flows
         monthToDate = Spending.monthToDate(txs, today: today)
         keptPercent = current.keptPercent

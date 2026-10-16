@@ -99,18 +99,22 @@ public enum Pending {
     /// Each card's unpaid latest bill and every recurring occurrence due within `horizonDays` of
     /// `today`, including overdue ones. A weekly payment can appear several times.
     public static func summary(today: LocalDay, statements: [CardStatement], recurring: [Recurring], transactions txs: [Transaction], horizonDays: Int = horizonDays) -> PendingSummary {
+        summary(today: today, statements: statements, recurring: recurring, payments: PendingPayments(transactions: txs), horizonDays: horizonDays)
+    }
+
+    /// As above, with the transactions already gathered into `payments` (`FinanceData.payments`).
+    public static func summary(today: LocalDay, statements: some Sequence<CardStatement>, recurring: some Sequence<Recurring>, payments: PendingPayments, horizonDays: Int = horizonDays) -> PendingSummary {
         let until = today.adding(days: horizonDays)
-        let bills: [PendingItem] = Statements.latestPerCard(statements).compactMap { s in
-            let unpaid = Statements.unpaidMinor(s, txs)
+        let bills: [PendingItem] = Statements.latestPerCard(Array(statements)).compactMap { s in
+            let paid = payments.paidMinor(on: s.uid)
+            let unpaid = max(s.totalDueMinor - paid, 0)
             guard unpaid > 0, s.dueOn <= until else { return nil }
             return PendingItem(kind: .cardBill, sourceUid: s.uid, title: s.cardUid, amountMinor: unpaid, dueOn: s.dueOn,
-                               minDueMinor: max(s.minDueMinor - Statements.paidMinor(s, txs), 0))
+                               minDueMinor: max(s.minDueMinor - paid, 0))
         }
-        struct Occurrence: Hashable { let uid: String; let dueOn: LocalDay? }
-        let paid = Set(txs.compactMap { tx in tx.recurringUid.map { Occurrence(uid: $0, dueOn: tx.dueOn) } })
         let occurrences: [PendingItem] = recurring.flatMap { payment in
             RecurringSchedule.occurrences(payment, until: until)
-                .filter { !paid.contains(Occurrence(uid: payment.uid, dueOn: $0)) }
+                .filter { !payments.isPaid(payment.uid, dueOn: $0) }
                 .map { PendingItem(kind: payment.kind == .subscription ? .subscription : .fixed, sourceUid: payment.uid,
                                    title: payment.name, amountMinor: payment.amountMinor, dueOn: $0, minDueMinor: nil) }
         }
@@ -126,5 +130,34 @@ public enum Pending {
     public static func urgency(_ dueOn: LocalDay, today: LocalDay) -> DueUrgency {
         if dueOn < today { return .overdue }
         return today.days(to: dueOn) <= soonDays ? .soon : .later
+    }
+}
+
+/// What the transactions have paid towards Pending payments, gathered in one pass: card payments by
+/// statement, and the recurring occurrences already paid.
+public struct PendingPayments: Sendable {
+    private struct Occurrence: Hashable, Sendable { let uid: String; let dueOn: LocalDay? }
+
+    private var paidByStatement: [String: Int64] = [:]
+    private var paidOccurrences: Set<Occurrence> = []
+
+    public init() {}
+
+    public init(transactions: some Sequence<Transaction>) {
+        for tx in transactions {
+            if tx.type == .cardPayment, let statementUid = tx.statementUid {
+                paidByStatement[statementUid, default: 0] += tx.amountMinor
+            }
+            if let recurringUid = tx.recurringUid {
+                paidOccurrences.insert(Occurrence(uid: recurringUid, dueOn: tx.dueOn))
+            }
+        }
+    }
+
+    /// As `Statements.paidMinor`.
+    public func paidMinor(on statementUid: String) -> Int64 { paidByStatement[statementUid] ?? 0 }
+
+    public func isPaid(_ recurringUid: String, dueOn: LocalDay) -> Bool {
+        paidOccurrences.contains(Occurrence(uid: recurringUid, dueOn: dueOn))
     }
 }

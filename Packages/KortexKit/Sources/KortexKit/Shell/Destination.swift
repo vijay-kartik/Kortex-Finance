@@ -55,8 +55,7 @@ public enum Destination: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .accounts: return data.moneyAccounts.count
         case .cards: return data.cards.count
         case .pending:
-            let due = Pending.summary(today: today, statements: Array(data.statements.values), recurring: Array(data.recurring.values),
-                                      transactions: Array(data.transactions.values)).count
+            let due = data.pendingSummary(today: today).count
             return due > 0 ? due : nil
         case .recurring: return data.recurring.count
         case .categories: return data.categories.count

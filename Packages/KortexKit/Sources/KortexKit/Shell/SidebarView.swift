@@ -18,44 +18,20 @@ struct SidebarView: View {
     @State private var leftovers: AccountRules.Leftovers?
 
     var body: some View {
+        // Only the rows read `selection`; the counts and ledgers are their own views, so choosing a
+        // destination doesn't recompute them.
         List(selection: Binding($selection)) {
-            let data = finance.data
-            let today = LocalDay.today()
             Section {
-                ForEach(Destination.overview) { row($0, count: $0.count(in: data, today: today)) }
+                ForEach(Destination.overview) { DestinationRow(destination: $0, selected: selection == $0, finance: finance).tag($0) }
             } header: {
                 Text("OVERVIEW").sectionLabelStyle()
             }
             Section {
-                ForEach(Destination.plan) { row($0, count: $0.count(in: data, today: today)) }
+                ForEach(Destination.plan) { DestinationRow(destination: $0, selected: selection == $0, finance: finance).tag($0) }
             } header: {
                 Text("PLAN").sectionLabelStyle()
             }
-            let moneyAccounts = data.moneyAccounts
-            let cards = data.cards
-            if !moneyAccounts.isEmpty {
-                Section {
-                    ForEach(moneyAccounts) { ledgerRow($0, data: data) }
-                } header: {
-                    Text("ACCOUNTS").sectionLabelStyle()
-                }
-            }
-            if !cards.isEmpty {
-                Section {
-                    ForEach(cards) { ledgerRow($0, data: data) }
-                } header: {
-                    HStack {
-                        Text("CARDS").sectionLabelStyle()
-                        Spacer(minLength: 4)
-                        if cards.contains(where: { $0.kind == .creditCard }) {
-                            Text(sidebarAmount(data.cardsOutstandingMinor))
-                                .font(.mono(11))
-                                .foregroundStyle(Color.kMuted.opacity(0.8))
-                                .help("Outstanding on all your credit cards")
-                        }
-                    }
-                }
-            }
+            SidebarLedgers(finance: finance, open: open).equatable()
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
@@ -85,51 +61,6 @@ struct SidebarView: View {
         } message: {
             Text(resetError ?? "")
         }
-    }
-
-    /// The trailing count is Muted, or Amber for Pending payments.
-    private func row(_ destination: Destination, count: Int?) -> some View {
-        HStack(spacing: 8) {
-            Label {
-                Text(destination.title).font(.grotesk(13, selection == destination ? .medium : .regular))
-            } icon: {
-                Image(systemName: destination.symbol)
-            }
-            Spacer(minLength: 4)
-            if let count {
-                Text("\(count)")
-                    .font(.mono(11))
-                    .foregroundStyle(destination == .pending ? Color.kAmber : Color.kMuted)
-                    .lineLimit(1)
-            }
-        }
-        .tag(destination)
-    }
-
-    /// Opens the account in Accounts, or the card in Cards.
-    private func ledgerRow(_ account: Account, data: FinanceData) -> some View {
-        HStack(spacing: 8) {
-            Label {
-                Text(account.kind.isCard ? cardTitle(account) : account.name)
-                    .font(.grotesk(13))
-                    .lineLimit(1)
-            } icon: {
-                Image(systemName: symbol(for: account.kind))
-            }
-            .foregroundStyle(Color.kMuted)
-            Spacer(minLength: 4)
-            Text(sidebarAmount(data.balanceMinor(of: account)))
-                .font(.mono(11))
-                .foregroundStyle(Color.kMuted.opacity(0.8))
-                .lineLimit(1)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { open(account) }
-    }
-
-    /// "₹1,45,000", or with paise when there are some.
-    private func sidebarAmount(_ minor: Int64) -> String {
-        Money.format(minor).replacingOccurrences(of: ".00", with: "")
     }
 
     private var accountFooter: some View {
@@ -214,6 +145,105 @@ struct SidebarView: View {
             }
             resetting = false
         }
+    }
+}
+
+/// A destination's row. Its count is a view of its own, so selecting the row redraws only the title.
+private struct DestinationRow: View {
+    let destination: Destination
+    let selected: Bool
+    let finance: any FinanceStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label {
+                Text(destination.title).font(.grotesk(13, selected ? .medium : .regular))
+            } icon: {
+                Image(systemName: destination.symbol)
+            }
+            Spacer(minLength: 4)
+            DestinationCount(destination: destination, finance: finance)
+        }
+    }
+}
+
+/// The trailing count is Muted, or Amber for Pending payments. Recomputed only when the data changes.
+private struct DestinationCount: View {
+    let destination: Destination
+    let finance: any FinanceStore
+
+    var body: some View {
+        if let count = destination.count(in: finance.data, today: LocalDay.today()) {
+            Text("\(count)")
+                .font(.mono(11))
+                .foregroundStyle(destination == .pending ? Color.kAmber : Color.kMuted)
+                .lineLimit(1)
+        }
+    }
+}
+
+/// The Accounts and Cards sections with their balances. Equal while the store is the same one, so
+/// the sidebar redrawing for a new selection leaves them be; a data change still redraws them, as
+/// they read `finance.data`. `open` is the app model's, which doesn't change.
+private struct SidebarLedgers: View, Equatable {
+    let finance: any FinanceStore
+    let open: (Account) -> Void
+
+    nonisolated static func == (a: Self, b: Self) -> Bool { a.finance === b.finance }
+
+    var body: some View {
+        let data = finance.data
+        let moneyAccounts = data.moneyAccounts
+        let cards = data.cards
+        if !moneyAccounts.isEmpty {
+            Section {
+                ForEach(moneyAccounts) { ledgerRow($0, data: data) }
+            } header: {
+                Text("ACCOUNTS").sectionLabelStyle()
+            }
+        }
+        if !cards.isEmpty {
+            Section {
+                ForEach(cards) { ledgerRow($0, data: data) }
+            } header: {
+                HStack {
+                    Text("CARDS").sectionLabelStyle()
+                    Spacer(minLength: 4)
+                    if cards.contains(where: { $0.kind == .creditCard }) {
+                        Text(sidebarAmount(data.cardsOutstandingMinor))
+                            .font(.mono(11))
+                            .foregroundStyle(Color.kMuted.opacity(0.8))
+                            .help("Outstanding on all your credit cards")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Opens the account in Accounts, or the card in Cards.
+    private func ledgerRow(_ account: Account, data: FinanceData) -> some View {
+        HStack(spacing: 8) {
+            Label {
+                Text(account.kind.isCard ? cardTitle(account) : account.name)
+                    .font(.grotesk(13))
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: symbol(for: account.kind))
+            }
+            .foregroundStyle(Color.kMuted)
+            Spacer(minLength: 4)
+            Text(sidebarAmount(data.balanceMinor(of: account)))
+                .font(.mono(11))
+                .foregroundStyle(Color.kMuted.opacity(0.8))
+                .lineLimit(1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { open(account) }
+    }
+
+    /// "₹1,45,000", or with paise when there are some.
+    private func sidebarAmount(_ minor: Int64) -> String {
+        Money.format(minor).replacingOccurrences(of: ".00", with: "")
     }
 
     private func cardTitle(_ card: Account) -> String {
