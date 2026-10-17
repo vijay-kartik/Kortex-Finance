@@ -142,7 +142,7 @@ struct ReceiptSheet: View {
                     AmountField(label: "Total", text: $amount)
                     TextField("Merchant", text: $merchant, prompt: Text("Whole Foods Market"))
                         .onChange(of: merchant) { _, new in
-                            if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, in: finance.data) }
+                            if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, kind: .expense, in: finance.data) }
                         }
                     DatePicker("Date", selection: $date, in: ...Date(), displayedComponents: .date)
                     AccountPicker(label: "Paid with", selection: $accountUid, accounts: accounts)
@@ -156,7 +156,7 @@ struct ReceiptSheet: View {
                 }
                 Section {
                     CategoryChips(selection: Binding(get: { categoryUid }, set: { categoryUid = $0; categoryTouched = true }),
-                                  categories: categories, suggested: EntryRules.rememberedCategory(for: merchant, in: data))
+                                  categories: categories, suggested: EntryRules.rememberedCategory(for: merchant, kind: .expense, in: data))
                 } header: { Text("Category") }
                 if !receipt.items.isEmpty || receipt.taxMinor != nil {
                     Section {
@@ -238,7 +238,7 @@ struct ReceiptSheet: View {
         let card = EntryMatching.cardFor(last4: parsed.last4, in: data)
         let name = parsed.merchant ?? ""
         merchant = data.merchants.values.first { $0.payeeKey == FinanceIds.payeeKey(name) }?.displayName ?? name
-        categoryUid = EntryRules.rememberedCategory(for: merchant, in: data)
+        categoryUid = EntryRules.rememberedCategory(for: merchant, kind: .expense, in: data)
         date = min(parsed.date?.date ?? Date(), Date())
         time = parsed.time
         accountUid = card?.uid ?? ""

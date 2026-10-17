@@ -287,12 +287,12 @@ public enum StatementImportRules {
                 : (t.direction == .credit ? .income : .expense)
             let categoryKind: CategoryKind = rowKind == .income ? .income : .expense
             let merchant = t.merchant?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let remembered = merchant.isEmpty ? nil : EntryRules.rememberedCategory(for: merchant, in: data)
+            let remembered = merchant.isEmpty ? nil : EntryRules.rememberedCategory(for: merchant, kind: categoryKind, in: data)
             let suggested = t.categoryId.flatMap { data.categories[$0]?.kind == categoryKind ? $0 : nil }
             rows.append(ImportRow(
                 id: i, include: true, date: day, description: t.description.trimmingCharacters(in: .whitespacesAndNewlines),
                 merchant: merchant, kind: rowKind, amountMinor: minor(t.amount),
-                categoryUid: rowKind == .cardPayment ? nil : (remembered.flatMap { data.categories[$0]?.kind == categoryKind ? $0 : nil } ?? suggested),
+                categoryUid: rowKind == .cardPayment ? nil : (remembered ?? suggested),
                 fromAccountUid: rowKind == .cardPayment ? onlyBank?.uid : nil,
                 reference: t.reference,
                 printedBalanceMinor: t.balanceAfter.map { signedBalance($0, debit: t.balanceAfterIsDebit, kind: kind) },

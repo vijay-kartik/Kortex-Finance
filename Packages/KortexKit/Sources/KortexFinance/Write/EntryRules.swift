@@ -307,10 +307,13 @@ public enum EntryRules {
         return .success(Change([.transaction(tx)]))
     }
 
-    /// The amount a picked category's merchant memory suggests: the category remembered for this payee.
-    public static func rememberedCategory(for merchant: String, in data: FinanceData) -> String? {
+    /// The amount a picked category's merchant memory suggests: the category remembered for this payee,
+    /// only when it is still there and of this kind (one memory serves a payee you pay and are paid by),
+    /// as Android's SuggestCategory.
+    public static func rememberedCategory(for merchant: String, kind: CategoryKind, in data: FinanceData) -> String? {
         let key = FinanceIds.payeeKey(merchant)
         guard !key.isEmpty else { return nil }
         return data.merchants.values.first { $0.payeeKey == key }?.categoryUid
+            .flatMap { data.categories[$0]?.kind == kind ? $0 : nil }
     }
 }
