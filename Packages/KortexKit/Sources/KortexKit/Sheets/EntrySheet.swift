@@ -108,7 +108,7 @@ struct EntrySheet: View {
         let categoryKind: CategoryKind = type == .income ? .income : .expense
         let categories = data.categories.values.filter { $0.kind == categoryKind }
             .sorted { ($0.builtIn ? 0 : 1, $0.sortOrder, $0.name) < ($1.builtIn ? 0 : 1, $1.sortOrder, $1.name) }
-        let suggested = EntryRules.rememberedCategory(for: merchant, in: data)
+        let suggested = EntryRules.rememberedCategory(for: merchant, kind: categoryKind, in: data)
 
         SheetChrome(
             title: editing == nil ? "Add \(EntryFormat.type(type).lowercased())"
@@ -128,6 +128,9 @@ struct EntrySheet: View {
                 .onChange(of: type) { _, new in
                     categoryUid = editing.flatMap { $0.type == new ? $0.categoryUid : nil }
                     categoryTouched = editing != nil
+                    if !categoryTouched, new == .expense || new == .income {
+                        categoryUid = EntryRules.rememberedCategory(for: merchant, kind: new == .income ? .income : .expense, in: data)
+                    }
                     if let editing { switchType(of: editing, to: new, in: data) }
                     if new != .expense, data.accounts[accountUid]?.kind == .creditCard {
                         accountUid = all.first { $0.kind != .creditCard }?.uid ?? ""
@@ -154,7 +157,7 @@ struct EntrySheet: View {
                     TextField(type == .income ? "From" : "Merchant / description", text: $merchant,
                               prompt: Text(type == .income ? "Acme Corp" : "Whole Foods Market"))
                         .onChange(of: merchant) { _, new in
-                            if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, in: data) }
+                            if !categoryTouched { categoryUid = EntryRules.rememberedCategory(for: new, kind: categoryKind, in: data) }
                         }
                     AccountPicker(label: type == .income ? "Received in" : "Paid with", selection: $accountUid, accounts: fromAccounts)
                 }

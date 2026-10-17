@@ -90,7 +90,30 @@ struct WriteRulesTests {
         #expect(m.categoryUid == "food")
         // The next entry for the same payee gets that category suggested.
         data.apply([RemoteRow.live(m)])
-        #expect(EntryRules.rememberedCategory(for: "WHOLE FOODS MARKET", in: data) == "food")
+        #expect(EntryRules.rememberedCategory(for: "WHOLE FOODS MARKET", kind: .expense, in: data) == "food")
+    }
+
+    /// One memory serves a payee you both pay and are paid by: only a category of the entry's kind is
+    /// suggested, as Android's SuggestCategory.
+    @Test func remembersACategoryOnlyForItsKind() throws {
+        var data = sample()
+        let paid = try EntryRules.add(TransactionDraft(type: .expense, amountMinor: 50_000, accountUid: "bank", categoryUid: "food",
+                                                      merchant: "Rahul"), in: data, clock: clock).get()
+        data.apply(paid.writes.compactMap { if case .merchant(let m) = $0 { RemoteRow.live(m) } else { nil } })
+        #expect(EntryRules.rememberedCategory(for: "rahul", kind: .expense, in: data) == "food")
+        #expect(EntryRules.rememberedCategory(for: "rahul", kind: .income, in: data) == nil)
+
+        let repaid = try EntryRules.add(TransactionDraft(type: .income, amountMinor: 50_000, accountUid: "bank", categoryUid: "salary",
+                                                        merchant: "Rahul"), in: data, clock: clock).get()
+        data.apply(repaid.writes.compactMap { if case .merchant(let m) = $0 { RemoteRow.live(m) } else { nil } })
+        #expect(EntryRules.rememberedCategory(for: "rahul", kind: .income, in: data) == "salary")
+        #expect(EntryRules.rememberedCategory(for: "rahul", kind: .expense, in: data) == nil)
+
+        let merchant = try #require(data.merchants.values.first { $0.payeeKey == "rahul" })
+        var gone = merchant
+        gone.categoryUid = "deleted"
+        data.apply([RemoteRow.live(gone)])
+        #expect(EntryRules.rememberedCategory(for: "rahul", kind: .income, in: data) == nil, "a deleted category isn't suggested")
     }
 
     @Test func refusesWhatAndroidRefuses() {
