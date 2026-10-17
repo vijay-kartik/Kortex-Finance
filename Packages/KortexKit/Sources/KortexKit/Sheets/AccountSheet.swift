@@ -22,6 +22,7 @@ struct AccountSheet: View {
     @State private var revealed: String?
     @State private var revealing = false
     @State private var copied = false
+    @Environment(\.scenePhase) private var scenePhase
 
     init(finance: any FinanceStore, editing: Account?, kind: AccountKind = .bank, close: @escaping () -> Void) {
         self.finance = finance
@@ -112,19 +113,31 @@ struct AccountSheet: View {
             LabeledContent("Full number") {
                 HStack(spacing: 8) {
                     if let revealed {
-                        Text(AccountNumbers.grouped(revealed)).font(.mono(13)).textSelection(.enabled)
+                        // Not selectable: Copy is the only way out, so it always goes through SensitivePasteboard.
+                        Text(AccountNumbers.grouped(revealed)).font(.mono(13))
                         Button(copied ? "Copied, clears in 1 min" : "Copy") {
                             SensitivePasteboard.copy(revealed)
                             copied = true
                         }
-                        Button("Hide") { self.revealed = nil; copied = false }
+                        Button("Hide", action: hide)
                     } else {
                         Text("Kept encrypted").foregroundStyle(Color.kMuted)
                         Button(revealing ? "Opening…" : "Show") { reveal(editing) }.disabled(revealing)
                     }
                 }
+                .task(id: revealed) {
+                    guard revealed != nil else { return }
+                    await RevealedNumber.waitToHide()
+                    if !Task.isCancelled { hide() }
+                }
+                .onChange(of: scenePhase) { _, phase in if phase != .active { hide() } }
             }
         }
+    }
+
+    private func hide() {
+        revealed = nil
+        copied = false
     }
 
     /// Touch ID or the Mac's password, then the number from finSecrets, opened here.
