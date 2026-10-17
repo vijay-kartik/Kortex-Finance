@@ -116,6 +116,19 @@ struct WriteRulesTests {
         if case .recurring(let r) = again.first { #expect(r.nextDueOn == day(2026, 11, 3)) }
     }
 
+    /// Deleting an account leaves the payments it paid pointing at it; paying one as it is is refused.
+    @Test func markPaidFromADeletedAccountIsRefused() {
+        var data = sample()
+        guard case .success(let deleted) = AccountRules.delete("card", in: data, clock: clock) else { Issue.record("expected a delete"); return }
+        data.apply(deleted)
+        #expect(data.recurring["netflix"]?.accountUid == "card")
+        #expect(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock).failure == .unknownAccount)
+        // Paid from an account you still have, it goes through.
+        let paid = writes(RecurringRules.markPaid("netflix", dueOn: day(2026, 10, 3), payment: PaymentDraft(accountUid: "bank"), in: data, clock: clock))
+        guard case .transaction(let tx) = paid.dropFirst().first else { Issue.record("expected the entry"); return }
+        #expect(tx.accountUid == "bank")
+    }
+
     @Test func skipAndAnchors() {
         let data = sample()
         guard case .recurring(let r) = writes(RecurringRules.skip("netflix", dueOn: day(2026, 10, 3), in: data, clock: clock)).first else {

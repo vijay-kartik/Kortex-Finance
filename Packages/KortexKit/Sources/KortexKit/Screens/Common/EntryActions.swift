@@ -12,7 +12,7 @@ enum EntryActions {
         case .markTransfer(let uid):
             model.sheet = .editEntry(uid, asTransfer: true)
         case .setCategory(let categoryUid):
-            finance.apply(EntryRules.setCategory(uids, to: categoryUid, in: finance.data))
+            model.apply(EntryRules.setCategory(uids, to: categoryUid, in: finance.data), to: finance, failing: "Couldn't change the category")
         case .delete:
             deleting.wrappedValue = uids.compactMap { finance.data.transactions[$0] }.filter { $0.type != .opening }
                 .sorted { $0.occurredAtMillis > $1.occurredAtMillis }
@@ -29,7 +29,8 @@ struct DeleteEntriesConfirmation: ViewModifier {
     func body(content: Content) -> some View {
         content.confirmationDialog(title, isPresented: Binding(get: { !deleting.isEmpty }, set: { if !$0 { deleting = [] } })) {
             Button(deleting.count == 1 ? "Delete Entry" : "Delete \(deleting.count) Entries", role: .destructive) {
-                finance.apply(EntryRules.delete(deleting.map(\.uid), in: finance.data))
+                model.apply(EntryRules.delete(deleting.map(\.uid), in: finance.data), to: finance,
+                            failing: deleting.count == 1 ? "Couldn't delete the entry" : "Couldn't delete the entries")
                 model.selectedEntryUids.subtract(deleting.map(\.uid))
                 deleting = []
             }

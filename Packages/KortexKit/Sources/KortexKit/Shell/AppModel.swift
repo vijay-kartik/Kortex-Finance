@@ -24,8 +24,36 @@ public final class AppModel {
 
     /// The sheet over the window, if any.
     public var sheet: Sheet?
+    /// Why the last action without a sheet of its own was refused, for the window's alert.
+    public var refusal: Refusal?
 
     public init() {}
+
+    /// Commits a change from an action with no sheet to show its error (a hover button, a right-click
+    /// menu, a confirmation), so a refusal (say, for data changed on the phone) shows in `refusal`.
+    /// Returns whether the change was made.
+    @discardableResult
+    public func apply(_ result: Result<Change, FinanceError>, to finance: any FinanceStore, failing title: String) -> Bool {
+        guard let failure = finance.apply(result) else { return true }
+        refusal = Refusal(title: title, message: failure.message)
+        return false
+    }
+
+    /// One-click Mark paid. When the payment's account is gone (deleted here or on the phone), opens
+    /// Mark as paid… to pick another; when its category is, says to edit the payment.
+    public func markPaid(_ recurringUid: String, dueOn: LocalDay, finance: any FinanceStore) {
+        let result = RecurringRules.markPaid(recurringUid, dueOn: dueOn, in: finance.data)
+        let name = finance.data.recurring[recurringUid]?.name ?? "the payment"
+        switch result {
+        case .failure(.unknownAccount):
+            sheet = .markPaid(recurringUid: recurringUid, dueOn: dueOn)
+        case .failure(.wrongCategoryKind):
+            refusal = Refusal(title: "Couldn't mark \(name) as paid",
+                              message: "Its category is no longer an expense category; it may have been deleted on another device. Edit the recurring payment to pick another.")
+        default:
+            apply(result, to: finance, failing: "Couldn't mark \(name) as paid")
+        }
+    }
 
     /// Closes `sheet` if it's still the one showing, so a late close from a sheet that's already
     /// gone can't dismiss the one opened since.
@@ -62,6 +90,12 @@ public final class AppModel {
             destination = .accounts
         }
     }
+}
+
+/// A change the rules refused, as the window's alert shows it.
+public struct Refusal: Equatable, Sendable {
+    public var title: String
+    public var message: String
 }
 
 /// The sheets the window can show, one at a time.

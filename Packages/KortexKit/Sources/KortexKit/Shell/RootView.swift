@@ -30,6 +30,11 @@ public struct RootView: View {
                 .sheet(item: $model.sheet) { sheet in
                     SheetHost(sheet: sheet, finance: session.finance, model: model, close: { model.dismiss(sheet) })
                 }
+                .alert(model.refusal?.title ?? "", isPresented: Binding(get: { model.refusal != nil }, set: { if !$0 { model.refusal = nil } })) {
+                    Button("OK") { model.refusal = nil }
+                } message: {
+                    Text(model.refusal?.message ?? "")
+                }
                 .modifier(ReceiptDropTarget(model: model))
             }
         }

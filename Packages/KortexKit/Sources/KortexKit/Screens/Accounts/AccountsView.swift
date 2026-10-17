@@ -46,7 +46,7 @@ struct AccountsView: View {
                 .help("Add an account, or read one in from a statement")
             }
         }
-        .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance) {
+        .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance, model: model) {
             model.selectedAccountUid = nil
         })
         .modifier(DeleteEntriesConfirmation(deleting: $deletingEntries, finance: finance, model: model))
@@ -302,6 +302,7 @@ enum AccountText {
 struct DeleteAccountConfirmation: ViewModifier {
     @Binding var deleting: Account?
     let finance: any FinanceStore
+    let model: AppModel
     let onDeleted: () -> Void
 
     func body(content: Content) -> some View {
@@ -321,7 +322,10 @@ struct DeleteAccountConfirmation: ViewModifier {
     }
 
     private func delete(withEntries: Bool) {
-        if let a = deleting { finance.apply(AccountRules.delete(a.uid, withEntries: withEntries, in: finance.data)); onDeleted() }
+        if let a = deleting {
+            model.apply(AccountRules.delete(a.uid, withEntries: withEntries, in: finance.data), to: finance, failing: "Couldn't delete \(a.name)")
+            onDeleted()
+        }
         deleting = nil
     }
 

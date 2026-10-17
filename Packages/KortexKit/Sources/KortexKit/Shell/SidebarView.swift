@@ -16,6 +16,8 @@ struct SidebarView: View {
     @State private var resetError: String?
     /// What deleted accounts left behind, waiting on Remove's confirmation.
     @State private var leftovers: AccountRules.Leftovers?
+    /// Why Remove was refused, say because the phone removed them first.
+    @State private var removeError: String?
 
     var body: some View {
         List(selection: Binding($selection)) {
@@ -69,7 +71,7 @@ struct SidebarView: View {
         .confirmationDialog(leftovers.map(leftoversTitle) ?? "",
                             isPresented: Binding(get: { leftovers.map { !$0.isEmpty } ?? false }, set: { if !$0 { leftovers = nil } })) {
             Button("Remove", role: .destructive) {
-                finance.apply(AccountRules.removeLeftovers(in: finance.data))
+                removeError = finance.apply(AccountRules.removeLeftovers(in: finance.data))?.message
                 leftovers = nil
             }
         } message: {
@@ -80,7 +82,12 @@ struct SidebarView: View {
         } message: {
             Text("No entries or bills are left from deleted accounts.")
         }
-        .alert("Couldn't reset your data", isPresented: Binding(get: { resetError != nil }, set: { if !$0 { resetError = nil } })) {
+        .alert("Couldn't remove the entries", isPresented: Binding(get: { removeError != nil }, set: { if !$0 { removeError = nil } })) {
+            Button("OK") { removeError = nil }
+        } message: {
+            Text(removeError ?? "")
+        }
+        .alert("Couldn't reset your data",isPresented: Binding(get: { resetError != nil }, set: { if !$0 { resetError = nil } })) {
             Button("OK") { resetError = nil }
         } message: {
             Text(resetError ?? "")
