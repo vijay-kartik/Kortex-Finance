@@ -1,39 +1,19 @@
 import AppKit
 import FirebaseAuth
 import GoogleSignIn
+import KortexFinance
 import Observation
-
-/// The signed-in Google account, as Firebase Auth reports it.
-public struct CloudUser: Sendable, Equatable {
-    public let uid: String
-    public let displayName: String?
-    public let email: String?
-
-    /// "AM" for Aarav Mehta; the email's first letter without a name.
-    public var initials: String {
-        let words = (displayName ?? "").split(separator: " ").prefix(2)
-        let letters = words.compactMap(\.first).map(String.init).joined()
-        return letters.isEmpty ? String(email?.first ?? "?").uppercased() : letters.uppercased()
-    }
-}
 
 /// Sign-in state for the whole app, plus the finance sync that runs while someone is signed in.
 /// Kortex can't be used signed out, so the window shows sign-in until `user` is set.
 @MainActor
 @Observable
-public final class CloudSession {
-    public enum State: Equatable {
-        /// Firebase hasn't said yet whether a user is restored from the keychain.
-        case starting
-        case signedOut
-        case signingIn
-        case signedIn(CloudUser)
-    }
-
-    public private(set) var state: State = .starting
-    /// Why the last sign-in failed, in words for the sign-in screen. Cleared on the next attempt.
+public final class CloudSession: Session {
+    /// `.starting` until Firebase says whether a user is restored from the keychain.
+    public private(set) var state: SessionState = .starting
     public private(set) var signInError: String?
-    public let finance = FinanceSync()
+    private let sync = FinanceSync()
+    public var finance: any FinanceStore { sync }
 
     @ObservationIgnored private var authListener: AuthStateDidChangeListenerHandle?
 
@@ -45,11 +25,6 @@ public final class CloudSession {
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             MainActor.assumeIsolated { self?.authChanged(user) }
         }
-    }
-
-    public var user: CloudUser? {
-        if case .signedIn(let user) = state { return user }
-        return nil
     }
 
     /// Google sign-in in a browser sheet, then Firebase sign-in with the Google credential.
@@ -79,16 +54,24 @@ public final class CloudSession {
         try? Auth.auth().signOut()
     }
 
+    public var appCheckToken: String? { Cloud.appCheckDebugToken }
+
+    /// Against this session's user, the one `finance` syncs.
+    public func checkFinanceKey() async throws {
+        guard let uid = user?.uid else { throw FinanceKeyError.signedOut }
+        try await FinanceKeys.check(userUid: uid)
+    }
+
     private func authChanged(_ firebaseUser: User?) {
         guard let firebaseUser else {
-            finance.stop()
+            sync.stop()
             // Keep the sign-in sheet's own state while a sign-in is under way.
             if state != .signingIn { state = .signedOut }
             return
         }
-        let user = CloudUser(uid: firebaseUser.uid, displayName: firebaseUser.displayName, email: firebaseUser.email)
+        let user = SessionUser(uid: firebaseUser.uid, displayName: firebaseUser.displayName, email: firebaseUser.email)
         state = .signedIn(user)
-        finance.start(userUid: user.uid)
+        sync.start(userUid: user.uid)
     }
 
     private enum SignInFailure: LocalizedError {

@@ -1,9 +1,9 @@
-import KortexCloud
+import KortexFinance
 import SwiftUI
 
 /// Shown whenever no one is signed in: Kortex has no signed-out mode.
 struct SignInView: View {
-    let session: CloudSession
+    let session: any Session
 
     var body: some View {
         ZStack {
@@ -44,4 +44,11 @@ struct SignInView: View {
             .padding(40)
         }
     }
+}
+
+#Preview("Sign-in failed") {
+    let session = PreviewSession(.signedOut, finance: PreviewFinanceStore())
+    session.signInError = "The network connection was lost."
+    return SignInView(session: session)
+        .frame(width: 1024, height: 680)
 }

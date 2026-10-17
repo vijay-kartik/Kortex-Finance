@@ -1,4 +1,3 @@
-import FirebaseAuth
 import FirebaseFunctions
 import Foundation
 import KortexFinance
@@ -17,9 +16,8 @@ public enum FinanceKeys {
     }
 
     /// Fetches from the server even when a key is kept, to check this Mac passes App Check.
-    public static func check() async throws {
-        guard let uid = Auth.auth().currentUser?.uid else { throw FinanceKeyError.signedOut }
-        store(try await fetch(uid))
+    public static func check(userUid: String) async throws {
+        store(try await fetch(userUid))
     }
 
     private static func fetch(_ userUid: String) async throws -> DataKey {
