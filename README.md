@@ -58,7 +58,10 @@ account's uid) with the user's data key and written to `finSecrets`, in the same
 and its `hasSecret`. Show reads it back after Touch ID or the Mac's password; it's never listened to.
 Copy puts it on this Mac's pasteboard only (not Universal Clipboard), marked with the nspasteboard.org
 concealed and transient types so clipboard managers don't record it, and clears it after a minute
-unless something else has been copied since (`KortexKit.SensitivePasteboard`).
+unless something else has been copied since (`KortexKit.SensitivePasteboard`). The shown number
+can't be selected, so Copy is the only way to copy it. It hides itself after a minute, or straight away
+when Kortex stops being the active app or the screen sleeps or locks (`KortexKit.RevealedNumber`);
+showing it again asks for Touch ID or the password again.
 
 The data key comes from the `financeKey` function, which enforces App Check, and is then kept in the
 Keychain (`KortexCloud.FinanceKeys`). App Attest needs a paid Apple Developer membership, so the Mac
