@@ -214,7 +214,7 @@ struct EntrySheet: View {
         guard let side = EntryRules.transferOtherSide(of: editing.uid, draft, in: data) else {
             return "\(other) has no entry for this money, so the transfer \(leaves ? "adds it to" : "takes it from") \(other)'s balance."
         }
-        let day = side.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
+        let day = Format.shortDay(side.occurredOn)
         return "Kortex has this money \(leaves ? "in to" : "out of") \(other) too: \"\(EntryFormat.title(side, data))\", \(day). "
             + "Saving makes the two one transfer, so neither counts as \(leaves ? "income" : "spending")."
     }
@@ -245,7 +245,7 @@ struct EntrySheet: View {
                 Picker("Pays bill", selection: $statementUid) {
                     Text("No bill").tag(String?.none)
                     ForEach(bills) { b in
-                        Text("\(b.statementOn.date.formatted(.dateTime.day().month(.abbreviated).year())) bill · \(Money.format(b.totalDueMinor)) due")
+                        Text("\(Format.shortDayYear(b.statementOn)) bill · \(Money.format(b.totalDueMinor)) due")
                             .tag(String?.some(b.uid))
                     }
                 }
@@ -260,7 +260,7 @@ struct EntrySheet: View {
     private func cardPaymentNote(_ data: FinanceData, credit: Bool) -> String {
         if credit { return "A refund lowers what the card owes. The purchase it refunds still counts as spending." }
         if let editing, let draft = makeDraft(), let side = EntryRules.cardPaymentOtherSide(of: editing.uid, draft, in: data) {
-            let day = side.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
+            let day = Format.shortDay(side.occurredOn)
             return "\(EntryFormat.account(side.toAccountUid, data)) has this payment from an unknown account on \(day). "
                 + "Saving makes it this one, paid from \(EntryFormat.account(draft.accountUid, data)), so the card isn't paid twice."
         }

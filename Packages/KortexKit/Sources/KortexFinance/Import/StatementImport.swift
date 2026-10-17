@@ -608,7 +608,7 @@ public enum StatementImportRules {
             rows[i].cardUid = cardUid
             rows[i].replaces = tx.uid
             let card = data.accounts[cardUid].map { c in c.last4.map { "\(c.name) ••\($0)" } ?? c.name } ?? "The card"
-            let day = tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
+            let day = issueDay(tx.occurredOn)
             rows[i].issue = tx.accountUid == FinanceIds.unknownAccount
                 ? "\(card) has a bill payment of this amount on \(day) from an unknown account: this is it. Saving records it as paid from this account."
                 : "\(card) already has this payment, recorded from \(data.accounts[tx.accountUid]?.name ?? "another account"). Saving records it as paid from this account instead."
@@ -648,7 +648,7 @@ public enum StatementImportRules {
             let bank = Balances.ledger(of: tx.accountUid, in: data.accounts)
             rows[i].fromAccountUid = bank
             rows[i].replaces = tx.uid
-            let day = tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
+            let day = issueDay(tx.occurredOn)
             let what = (tx.merchant ?? tx.note).map { "\"\($0)\"" } ?? "A debit with no details"
             rows[i].issue = "\(what), money out from \(data.accounts[bank]?.name ?? "a bank") on \(day), is this payment. Saving makes it "
                 + "the card's bill payment, so it no longer counts as spending. Pick another paid-from account to keep it as it is."
@@ -735,7 +735,7 @@ public enum StatementImportRules {
             rows[i] = madeTransfer(row, with: account)
             rows[i].replaces = tx.uid
             let what = (tx.merchant ?? tx.note).map { "\"\($0)\"" } ?? "An entry with no details"
-            let day = tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))
+            let day = issueDay(tx.occurredOn)
             let side = other == .income ? "money in to" : "money out from"
             rows[i].issue = "\(what), \(side) \(data.accounts[account]?.name ?? "another account") on \(day), is the other side of this transfer. "
                 + "Saving makes it the transfer, so it no longer counts as \(other == .income ? "income" : "spending"). Pick another account to keep it as it is."
@@ -753,6 +753,11 @@ public enum StatementImportRules {
         row.mandateRef = nil
         row.otherSideMissing = false
         return row
+    }
+
+    /// "3 Oct": the day of an entry a row's issue points to.
+    private static func issueDay(_ day: LocalDay) -> String {
+        day.date.formatted(.dateTime.day().month(.abbreviated))
     }
 
     private static func looksLikePayment(_ description: String) -> Bool {

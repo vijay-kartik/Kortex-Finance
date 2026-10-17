@@ -78,7 +78,7 @@ struct EntryInspector: View {
         }
         if tx.type == .cardPayment, !tx.isCardCredit {
             rows.append(("Bill", tx.statementUid.flatMap { data.statements[$0] }
-                .map { "\($0.statementOn.date.formatted(.dateTime.day().month(.abbreviated))) bill" } ?? "None"))
+                .map { "\(Format.shortDay($0.statementOn)) bill" } ?? "None"))
         }
         if let uid = tx.recurringUid {
             rows.append(("Recurring", data.recurring[uid]?.name ?? "Deleted payment"))

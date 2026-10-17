@@ -93,7 +93,7 @@ enum EntryFormat {
 
     /// "Mon, 28 Sep 2026 · 6:42 PM".
     static func when(_ tx: Entry) -> String {
-        let day = tx.occurredOn.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
+        let day = Format.fullDueDay(tx.occurredOn)
         let time = Date(timeIntervalSince1970: TimeInterval(tx.occurredAtMillis) / 1000).formatted(date: .omitted, time: .shortened)
         return "\(day) · \(time)"
     }

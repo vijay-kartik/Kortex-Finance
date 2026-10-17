@@ -194,7 +194,7 @@ struct AccountSheet: View {
     /// On edit: the day the balance starts from, and that changing it moves the balance by the difference.
     private var openingFooter: String {
         guard let editing else { return "Saved as the first entry: balances only ever change through entries." }
-        let day = AccountRules.openingDay(of: editing.uid, in: finance.data).date.formatted(.dateTime.day().month(.abbreviated).year())
+        let day = Format.shortDayYear(AccountRules.openingDay(of: editing.uid, in: finance.data))
         return "What it \(editing.kind == .creditCard ? "owed" : "held") on \(day), before its first entry. "
             + "Changing it moves the balance today by the same amount."
     }

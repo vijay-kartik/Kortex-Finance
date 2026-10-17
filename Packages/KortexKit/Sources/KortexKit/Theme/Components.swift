@@ -326,9 +326,29 @@ enum Format {
         month.date.formatted(.dateTime.month(.abbreviated)).uppercased()
     }
 
+    /// "September 2026".
+    static func monthYear(_ month: YearMonth) -> String {
+        month.date.formatted(.dateTime.month(.wide).year())
+    }
+
+    /// "3 Oct".
+    static func shortDay(_ day: LocalDay) -> String {
+        day.date.formatted(.dateTime.day().month(.abbreviated))
+    }
+
+    /// "3 Oct 2026".
+    static func shortDayYear(_ day: LocalDay) -> String {
+        day.date.formatted(.dateTime.day().month(.abbreviated).year())
+    }
+
     /// "Sat, 3 Oct".
     static func dueDay(_ day: LocalDay) -> String {
         day.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+    }
+
+    /// "Sat, 3 Oct 2026".
+    static func fullDueDay(_ day: LocalDay) -> String {
+        day.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
     }
 
     /// "Tuesday, 29 September".
