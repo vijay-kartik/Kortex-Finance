@@ -35,7 +35,7 @@ struct KortexApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(session: session)
         }
     }
 }

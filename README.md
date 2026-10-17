@@ -49,6 +49,9 @@ documents built field for field as Android writes them (`FinanceDocWriter`): eve
 
 Screens and sheets only see the `KortexFinance.FinanceStore` protocol, which `FinanceSync` conforms to;
 `PreviewFinanceStore` keeps everything in memory, for `#Preview`s and tests without Firebase.
+In the same way the window and Settings only see `KortexFinance.Session` (sign-in, the store, the
+App Check token and Check), which `KortexCloud.CloudSession` conforms to and `PreviewSession` fakes;
+only `App/` imports `KortexCloud`.
 
 ## Full account numbers
 

@@ -1,4 +1,3 @@
-import KortexCloud
 import KortexFinance
 import SwiftUI
 
@@ -7,7 +6,7 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selection: Destination
     let finance: any FinanceStore
-    let user: CloudUser
+    let user: SessionUser
     let open: (Account) -> Void
     let signOut: () -> Void
 

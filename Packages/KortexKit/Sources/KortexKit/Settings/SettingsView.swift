@@ -1,16 +1,20 @@
 import AppKit
 import KortexAI
-import KortexCloud
+import KortexFinance
 import SwiftUI
 
 /// Kortex › Settings… (⌘,).
 public struct SettingsView: View {
-    public init() {}
+    private let session: any Session
+
+    public init(session: any Session) {
+        self.session = session
+    }
 
     public var body: some View {
         TabView {
             AISettings().tabItem { Label("AI", systemImage: "sparkles") }
-            AccountNumberSettings().tabItem { Label("Account Numbers", systemImage: "lock.shield") }
+            AccountNumberSettings(session: session).tabItem { Label("Account Numbers", systemImage: "lock.shield") }
         }
         .frame(width: 560)
         .preferredColorScheme(.dark)
@@ -88,9 +92,15 @@ struct AISettings: View {
 /// App Check for full account numbers: the `financeKey` function only answers the Kortex app, and
 /// without App Attest (a paid Apple Developer membership) this Mac proves itself with a debug token.
 struct AccountNumberSettings: View {
-    @State private var token = Cloud.appCheckDebugToken
+    let session: any Session
+    @State private var token: String?
     @State private var status: String?
     @State private var checking = false
+
+    init(session: any Session) {
+        self.session = session
+        _token = State(initialValue: session.appCheckToken)
+    }
 
     var body: some View {
         Form {
@@ -128,7 +138,7 @@ struct AccountNumberSettings: View {
         status = nil
         Task {
             do {
-                try await FinanceKeys.check()
+                try await session.checkFinanceKey()
                 status = "This Mac can save and show full numbers."
             } catch {
                 status = error.localizedDescription
@@ -136,4 +146,10 @@ struct AccountNumberSettings: View {
             checking = false
         }
     }
+}
+
+#Preview("Account Numbers") {
+    AccountNumberSettings(session: PreviewSession(finance: PreviewFinanceStore()))
+        .frame(width: 560)
+        .preferredColorScheme(.dark)
 }
