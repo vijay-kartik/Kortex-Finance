@@ -110,7 +110,7 @@ struct Report {
             to = month == today.yearMonth ? today : month.lastDay
             prevFrom = month.adding(months: -1).firstDay
             prevTo = month.adding(months: -1).lastDay
-            title = month.date.formatted(.dateTime.month(.wide).year())
+            title = Format.monthYear(month)
             previousName = Format.monthName(month.adding(months: -1))
             buckets = (1...to.day).map { d in ("\(d)", Spending.spentMinor(txs, from: month.day(d), to: month.day(d))) }
         }
@@ -269,7 +269,7 @@ struct ReportContent: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(EntryFormat.title(tx, report.data)).font(.grotesk(13)).foregroundStyle(Color.kInk)
-                            Text([tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated)), EntryFormat.categoryName(tx.categoryUid, report.data)]
+                            Text([Format.shortDay(tx.occurredOn), EntryFormat.categoryName(tx.categoryUid, report.data)]
                                 .compactMap { $0 }.joined(separator: " · "))
                                 .font(.grotesk(11)).foregroundStyle(Color.kMuted)
                         }

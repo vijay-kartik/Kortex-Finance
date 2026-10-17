@@ -294,7 +294,7 @@ enum AccountText {
         let today = LocalDay.today()
         if day == today { return "Last entry today" }
         if day == today.adding(days: -1) { return "Last entry yesterday" }
-        return "Last entry \(day.date.formatted(.dateTime.day().month(.abbreviated)))"
+        return "Last entry \(Format.shortDay(day))"
     }
 }
 

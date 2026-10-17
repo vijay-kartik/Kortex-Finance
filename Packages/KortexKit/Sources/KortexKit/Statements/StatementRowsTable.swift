@@ -257,7 +257,7 @@ private struct MatchChip: View {
         guard let m = row.match else { return "Not in Kortex yet: it will be added." }
         guard let tx = data.transactions[m.transactionUid] else { return m.reason }
         let entry = [EntryFormat.title(tx, data), Money.format(tx.amountMinor),
-                     tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated)), EntryFormat.sourceName(tx.source)].joined(separator: " · ")
+                     Format.shortDay(tx.occurredOn),EntryFormat.sourceName(tx.source)].joined(separator: " · ")
         let verdict = m.sure ? "Already in Kortex" : "Possibly already in Kortex"
         return "\(verdict) (\(m.reason.lowercased())): \(entry).\n" + (row.include
             ? "Ticked, so it will be added again as a second entry."

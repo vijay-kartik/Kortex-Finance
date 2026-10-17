@@ -105,8 +105,8 @@ struct ExpensesView: View {
         switch p.mode {
         case .daily:
             let name = p.day == today ? "Today" : p.day == today.adding(days: -1) ? "Yesterday" : p.day.date.formatted(.dateTime.weekday(.abbreviated))
-            return "\(name), \(p.day.date.formatted(.dateTime.day().month(.abbreviated).year()))"
-        case .monthly: return p.month.date.formatted(.dateTime.month(.wide).year())
+            return "\(name), \(Format.shortDayYear(p.day))"
+        case .monthly: return Format.monthYear(p.month)
         case .yearly: return String(p.year)
         }
     }
@@ -203,7 +203,7 @@ private struct ExpensesSummary: View {
             data, month: month, to: to, today: today,
             money: { Money.format($0, wholeUnits: !$1) },
             monthName: Format.monthName,
-            dayName: { $0.date.formatted(.dateTime.day().month(.abbreviated)) }
+            dayName: Format.shortDay
         )
         return VStack(alignment: .leading, spacing: 16) {
             row {

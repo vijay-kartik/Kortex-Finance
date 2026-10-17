@@ -266,17 +266,16 @@ struct StatementImportSheet: View {
         let matched = s.rows.filter { $0.match != nil }.count
         let toAdd = s.rows.filter(\.include).count
         let r = summaries.reconciliation(s, in: finance.data)
-        let day = { (d: LocalDay) in d.date.formatted(.dateTime.day().month(.abbreviated)) }
         return VStack(alignment: .leading, spacing: 6) {
             Text("CHECK AGAINST KORTEX").sectionLabelStyle()
             Text("\(s.rows.count) rows · \(matched) already in Kortex · \(toAdd) to add").foregroundStyle(Color.kMuted)
             if let r {
                 Hairline()
-                LabeledContent(isCard ? "Owed on \(day(s.openingOn)), statement" : "Opening, statement", value: Money.format(s.openingMinor))
+                LabeledContent(isCard ? "Owed on \(Format.shortDay(s.openingOn)), statement" : "Opening, statement", value: Money.format(s.openingMinor))
                 LabeledContent("In Kortex", value: Money.format(r.kortexOpeningMinor))
                 Hairline()
                 if let closing = s.closingMinor {
-                    LabeledContent(isCard ? "Owed on \(day(s.closingOn)), statement" : "Closing, statement", value: Money.format(closing))
+                    LabeledContent(isCard ? "Owed on \(Format.shortDay(s.closingOn)), statement" : "Closing, statement", value: Money.format(closing))
                 }
                 LabeledContent("In Kortex after adding", value: Money.format(r.kortexClosingMinor))
                 if let closing = s.closingMinor {
@@ -309,7 +308,7 @@ struct StatementImportSheet: View {
             Text("IN KORTEX, NOT ON THE STATEMENT · \(entries.count)").sectionLabelStyle()
             ForEach(shown) { tx in
                 HStack(spacing: 8) {
-                    Text(tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))).font(.mono(10)).foregroundStyle(Color.kMuted)
+                    Text(Format.shortDay(tx.occurredOn)).font(.mono(10)).foregroundStyle(Color.kMuted)
                         .frame(width: 44, alignment: .leading)
                     Text(EntryFormat.title(tx, finance.data)).lineLimit(1).foregroundStyle(Color.kInk)
                     Spacer()
@@ -378,7 +377,7 @@ struct StatementImportSheet: View {
                           format: .number.precision(.fractionLength(2)))
                     .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 120)
             }
-            Text("on \(s.openingOn.date.formatted(.dateTime.day().month(.abbreviated).year()))").font(.grotesk(11)).foregroundStyle(Color.kMuted)
+            Text("on \(Format.shortDayYear(s.openingOn))").font(.grotesk(11)).foregroundStyle(Color.kMuted)
             LabeledContent(isCard ? "+ Spent" : "+ Money in", value: Money.format(isCard ? outflow : inflow))
             LabeledContent(isCard ? "− Paid off and refunded" : "− Money out", value: Money.format(isCard ? inflow : outflow))
             Hairline()

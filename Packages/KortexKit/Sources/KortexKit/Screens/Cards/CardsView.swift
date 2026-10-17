@@ -147,7 +147,7 @@ struct CardDetail: View {
                     }
                 }
                 if let statement, let spentSince {
-                    figure("Spent since \(statement.statementOn.date.formatted(.dateTime.day().month(.abbreviated))) statement", Money.format(spentSince))
+                    figure("Spent since \(Format.shortDay(statement.statementOn)) statement", Money.format(spentSince))
                 } else {
                     figure("Outstanding", Money.format(position.outstandingMinor))
                 }
@@ -208,10 +208,10 @@ struct CardDetail: View {
                     VStack(spacing: 0) {
                         Hairline()
                         HStack(spacing: 12) {
-                            Text(s.statementOn.date.formatted(.dateTime.month(.wide).year()))
+                            Text(Format.monthYear(s.statementOn.yearMonth))
                                 .font(.grotesk(13)).foregroundStyle(Color.kInk).frame(maxWidth: .infinity, alignment: .leading)
                             Text(Money.format(s.totalDueMinor)).font(.mono(13)).foregroundStyle(Color.kInk).frame(width: 110, alignment: .trailing)
-                            Text(s.dueOn.date.formatted(.dateTime.day().month(.abbreviated))).font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                            Text(Format.shortDay(s.dueOn)).font(.grotesk(12)).foregroundStyle(Color.kMuted)
                                 .frame(width: 80, alignment: .trailing)
                             statusChip(s, txs: txs, today: today).frame(width: 120, alignment: .trailing)
                         }
@@ -224,7 +224,7 @@ struct CardDetail: View {
 
     private func statusChip(_ s: CardStatement, txs: [Entry], today: LocalDay) -> some View {
         let (text, color): (String, Color) = switch Statements.status(s, txs, today: today) {
-        case .paid: (Statements.paidOn(s, txs).map { "Paid \($0.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "Paid", .kGrowth)
+        case .paid: (Statements.paidOn(s, txs).map { "Paid \(Format.shortDay($0))" } ?? "Paid", .kGrowth)
         case .partlyPaid: ("Part paid", .kAmber)
         case .overdue: ("Overdue", .kAlarm)
         case .due: ("Unpaid", .kAmber)
@@ -264,7 +264,7 @@ struct CardDetail: View {
                     HStack {
                         Text(EntryFormat.title(tx, data)).font(.grotesk(13)).foregroundStyle(Color.kInk)
                         Spacer()
-                        Text(tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))).font(.grotesk(12)).foregroundStyle(Color.kMuted)
+                        Text(Format.shortDay(tx.occurredOn)).font(.grotesk(12)).foregroundStyle(Color.kMuted)
                         Text(EntryFormat.amount(tx)).font(.mono(13)).foregroundStyle(Color.kInk).frame(width: 110, alignment: .trailing)
                     }
                     .padding(.vertical, 9)

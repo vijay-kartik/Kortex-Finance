@@ -103,7 +103,7 @@ struct RecurringView: View {
                         .lineLimit(1).fixedSize()
                 }
                 figure("Over a year", Money.format(t.perYearMinor, wholeUnits: true))
-                figure("Next due", next.map { "\($0.name) · \($0.nextDueOn.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "—")
+                figure("Next due", next.map { "\($0.name) · \(Format.shortDay($0.nextDueOn))" } ?? "—")
                     .layoutPriority(-1)
                 Spacer()
             }
@@ -216,7 +216,7 @@ struct RecurringInspector: View {
         let rows: [(String, String)] = [
             ("Type", r.kind == .subscription ? "Subscription" : "Fixed expense"),
             ("Repeats", RecurringSchedule.repeatsLabel(r)),
-            ("Next due", r.paused ? "Paused" : r.nextDueOn.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())),
+            ("Next due", r.paused ? "Paused" : Format.fullDueDay(r.nextDueOn)),
             ("Paid from", EntryFormat.account(r.accountUid, data)),
             ("Category", EntryFormat.categoryName(r.categoryUid, data) ?? "Uncategorised"),
             ("Remind me", RecurringSchedule.reminderLabel(r.remindDaysBefore)),
@@ -246,7 +246,7 @@ struct RecurringInspector: View {
                 }
                 ForEach(payments.prefix(12)) { tx in
                     HStack {
-                        Text((tx.dueOn ?? tx.occurredOn).date.formatted(.dateTime.day().month(.abbreviated).year()))
+                        Text(Format.shortDayYear(tx.dueOn ?? tx.occurredOn))
                             .font(.grotesk(12)).foregroundStyle(Color.kInk)
                         Spacer()
                         Text(Money.format(tx.amountMinor, currency: tx.currency)).font(.mono(12)).foregroundStyle(Color.kInk)

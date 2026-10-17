@@ -88,7 +88,7 @@ struct PendingView: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
         return KCard(spacing: 10) {
             HStack {
-                Text(month.date.formatted(.dateTime.month(.wide).year())).font(.grotesk(14, .medium)).foregroundStyle(Color.kInk)
+                Text(Format.monthYear(month)).font(.grotesk(14, .medium)).foregroundStyle(Color.kInk)
                 Spacer()
                 Button { calendarMonth = month.adding(months: -1) } label: { Image(systemName: "chevron.left") }
                     .buttonStyle(.borderless)
