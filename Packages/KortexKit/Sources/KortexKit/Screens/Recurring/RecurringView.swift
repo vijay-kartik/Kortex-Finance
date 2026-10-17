@@ -80,12 +80,15 @@ struct RecurringView: View {
         .sidePanel(isPresented: showsInspector) {
             RecurringInspector(recurring: model.selectedRecurringUid.flatMap { data.recurring[$0] }, data: data,
                                onEdit: { model.sheet = .recurring($0.uid) },
-                               onPause: { finance.apply(RecurringRules.setPaused($0.uid, !$0.paused, in: finance.data)) },
+                               onPause: setPaused,
                                onDelete: { deleting = $0 })
         }
         .confirmationDialog(deleting.map { "Delete \($0.name)?" } ?? "", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("Delete recurring payment", role: .destructive) {
-                if let r = deleting { finance.apply(RecurringRules.delete(r.uid, in: finance.data)); model.selectedRecurringUid = nil }
+                if let r = deleting {
+                    model.apply(RecurringRules.delete(r.uid, in: finance.data), to: finance, failing: "Couldn't delete \(r.name)")
+                    model.selectedRecurringUid = nil
+                }
                 deleting = nil
             }
         } message: {
@@ -145,12 +148,14 @@ struct RecurringView: View {
                     row(r, data: data, today: today).tag(r.uid)
                         .contextMenu {
                             if !r.paused {
-                                Button("Mark \(Format.dueDay(r.nextDueOn)) as paid") { finance.apply(RecurringRules.markPaid(r.uid, dueOn: r.nextDueOn, in: finance.data)) }
-                                Button("Skip \(Format.dueDay(r.nextDueOn))") { finance.apply(RecurringRules.skip(r.uid, dueOn: r.nextDueOn, in: finance.data)) }
+                                Button("Mark \(Format.dueDay(r.nextDueOn)) as paid") { model.markPaid(r.uid, dueOn: r.nextDueOn, finance: finance) }
+                                Button("Skip \(Format.dueDay(r.nextDueOn))") {
+                                    model.apply(RecurringRules.skip(r.uid, dueOn: r.nextDueOn, in: finance.data), to: finance, failing: "Couldn't skip \(r.name)")
+                                }
                                 Divider()
                             }
                             Button("Edit…") { model.sheet = .recurring(r.uid) }
-                            Button(r.paused ? "Resume" : "Pause") { finance.apply(RecurringRules.setPaused(r.uid, !r.paused, in: finance.data)) }
+                            Button(r.paused ? "Resume" : "Pause") { setPaused(r) }
                             Button("Delete…", role: .destructive) { deleting = r }
                         }
                 }
@@ -185,6 +190,11 @@ struct RecurringView: View {
         }
         .padding(.vertical, 6)
         .opacity(r.paused ? 0.6 : 1)
+    }
+
+    private func setPaused(_ r: Recurring) {
+        model.apply(RecurringRules.setPaused(r.uid, !r.paused, in: finance.data), to: finance,
+                    failing: r.paused ? "Couldn't resume \(r.name)" : "Couldn't pause \(r.name)")
     }
 }
 

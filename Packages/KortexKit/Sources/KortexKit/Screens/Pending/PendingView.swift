@@ -278,6 +278,6 @@ struct PendingActions: ViewModifier {
             }
     }
 
-    private func markPaid() { finance.apply(RecurringRules.markPaid(item.sourceUid, dueOn: item.dueOn, in: finance.data)) }
-    private func skip() { finance.apply(RecurringRules.skip(item.sourceUid, dueOn: item.dueOn, in: finance.data)) }
+    private func markPaid() { model.markPaid(item.sourceUid, dueOn: item.dueOn, finance: finance) }
+    private func skip() { model.apply(RecurringRules.skip(item.sourceUid, dueOn: item.dueOn, in: finance.data), to: finance, failing: "Couldn't skip this payment") }
 }

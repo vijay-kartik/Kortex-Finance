@@ -35,7 +35,7 @@ struct CardsView: View {
         .background(Color.kVoid)
         .navigationTitle(cards.count == 1 || cards.isEmpty ? "Cards" : "Cards")
         .navigationSubtitle(cards.count == 1 ? "1 card" : "\(cards.count) cards")
-        .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance) { model.selectedCardUid = nil })
+        .modifier(DeleteAccountConfirmation(deleting: $deleting, finance: finance, model: model) { model.selectedCardUid = nil })
         .modifier(DeleteEntriesConfirmation(deleting: $deletingEntries, finance: finance, model: model))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
