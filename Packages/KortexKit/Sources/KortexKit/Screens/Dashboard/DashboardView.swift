@@ -70,23 +70,14 @@ struct DashboardView: View {
         HStack(alignment: .top, spacing: 16) { content() }.fixedSize(horizontal: false, vertical: true)
     }
 
+    @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: finance.status == .loading ? "arrow.triangle.2.circlepath" : "wallet.bifold")
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(Color.kSynapse)
-            Text(finance.status == .loading ? "Syncing your finances…" : "No accounts yet")
-                .font(.grotesk(20, .medium))
-                .foregroundStyle(Color.kInk)
-            Text(finance.status == .loading ? "This takes a moment the first time." : "Add one here or on your phone; it shows up on both.")
-                .font(.grotesk(13))
-                .foregroundStyle(Color.kMuted)
-            if finance.status != .loading {
-                Button("Add account…") { appModel.sheet = .account(nil, .bank) }
-                    .buttonStyle(.kortexPrimary).padding(.top, 6)
-            }
+        if finance.status == .loading {
+            KEmptyState("Syncing your finances…", message: "This takes a moment the first time.")
+        } else {
+            KEmptyState("No accounts yet", message: "Add one here or on your phone; it shows up on both.",
+                        action: .init(label: "Add account") { appModel.sheet = .account(nil, .bank) })
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

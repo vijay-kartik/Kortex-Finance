@@ -39,9 +39,9 @@ struct ExpensesView: View {
                     KSegmented("Show", selection: $filter, options: Filter.allCases.map { ($0, $0.rawValue) })
                 }
                 if shown.isEmpty {
-                    Text(inPeriod.isEmpty ? "Nothing added in this period." : "No \(filter.rawValue.lowercased()) in this period.")
-                        .font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    let empty = Self.emptyCopy(filter: filter, period: period, today: today)
+                    KEmptyState(empty.title, message: empty.message,
+                                action: .init(label: empty.action, hint: empty.hint) { model.sheet = .newEntry(empty.type) })
                 } else {
                     EntriesTable(entries: shown, data: data, selection: $model.selectedEntryUids, focusOnAppear: true) { action, uids in
                         perform(action, on: uids)
@@ -109,6 +109,29 @@ struct ExpensesView: View {
         case .monthly: return p.month.date.formatted(.dateTime.month(.wide).year())
         case .yearly: return String(p.year)
         }
+    }
+
+    /// The empty table's words (Figma: Empty state · No expenses): "No expenses this month", and Add
+    /// expense ⌘N, or Add income ⇧⌘N when showing income. The hints are File › New's shortcuts.
+    static func emptyCopy(filter: Filter, period p: ExpensesPeriod, today: LocalDay)
+        -> (title: String, message: String, action: String, hint: String, type: TransactionType) {
+        let when: String
+        let span: String
+        switch p.mode {
+        case .daily:
+            when = p.day == today ? "today" : "on \(Format.dueDay(p.day))"
+            span = "day"
+        case .monthly:
+            when = p.month == today.yearMonth ? "this month" : "in \(p.month.date.formatted(.dateTime.month(.wide).year()))"
+            span = "month"
+        case .yearly:
+            when = p.year == today.year ? "this year" : "in \(p.year)"
+            span = "year"
+        }
+        if filter == .income {
+            return ("No income \(when)", "Add income to see what came in this \(span).", "Add income", "⇧⌘N", .income)
+        }
+        return ("No expenses \(when)", "Add an expense to start tracking your \(span).", "Add expense", "⌘N", .expense)
     }
 
     private func footer(_ shown: [Entry]) -> some View {

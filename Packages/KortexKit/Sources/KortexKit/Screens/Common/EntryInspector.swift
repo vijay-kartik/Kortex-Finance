@@ -16,11 +16,7 @@ struct EntryInspector: View {
             if let entry {
                 ScrollView { details(entry).padding(20) }
             } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "sidebar.right").font(.system(size: 22, weight: .light)).foregroundStyle(Color.kMuted)
-                    Text("Select an entry to see its details").font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                KInspectorPlaceholder("Select an entry to see its details")
             }
         }
         .background(Color.kSidebar)
