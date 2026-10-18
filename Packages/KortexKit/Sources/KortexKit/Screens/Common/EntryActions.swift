@@ -46,7 +46,7 @@ struct DeleteEntriesConfirmation: ViewModifier {
         if deleting.count == 1, let tx = deleting.first {
             return "\(EntryFormat.amount(tx)) on \(tx.occurredOn.date.formatted(.dateTime.day().month(.abbreviated))). It's removed on your phone too."
         }
-        let total = deleting.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
+        let total = Spending.spentMinor(deleting)
         let spent = total > 0 ? " Together they spent \(Money.format(total))." : ""
         return "They're removed on your phone too.\(spent)"
     }

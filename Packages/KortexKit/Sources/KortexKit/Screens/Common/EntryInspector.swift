@@ -73,7 +73,7 @@ struct EntryInspector: View {
         default:
             rows.append(("Paid with", EntryFormat.account(tx.accountUid, data)))
         }
-        if tx.type == .expense || tx.type == .income {
+        if tx.type.takesCategory {
             rows.append(("Category", EntryFormat.category(tx, data)?.name ?? "Uncategorised"))
         }
         if tx.type == .cardPayment, !tx.isCardCredit {
@@ -140,9 +140,9 @@ struct SelectionSummary: View {
     let entries: [Entry]
 
     var body: some View {
-        let out = entries.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        let inn = entries.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        let uncategorised = entries.filter { ($0.type == .expense || $0.type == .income) && $0.categoryUid == nil }.count
+        let out = Spending.spentMinor(entries)
+        let inn = Spending.incomeMinor(entries)
+        let uncategorised = entries.filter { $0.type.takesCategory && $0.categoryUid == nil }.count
         VStack(alignment: .leading, spacing: 16) {
             Text("\(entries.count) ENTRIES SELECTED").sectionLabelStyle()
             VStack(alignment: .leading, spacing: 4) {

@@ -85,6 +85,24 @@ struct CalcTests {
         #expect(flow.keptPercent == 41)
     }
 
+    @Test func listTotalsCountOnlyExpensesAndIncomeWheneverTheyWere() {
+        let txs = [
+            tx("o", .opening, 100_000, on: day(2026, 9, 1)),
+            tx("i", .income, 542_000, on: day(2026, 9, 1)),
+            tx("e", .expense, 318_050, on: day(2026, 9, 2)),
+            tx("f", .expense, 1_950, on: day(2025, 1, 15)),
+            tx("j", .income, 8_000, on: day(2027, 3, 1)),
+            tx("p", .cardPayment, 140_000, on: day(2026, 9, 3)),
+            tx("t", .transfer, 5_000, on: day(2026, 9, 4)),
+        ]
+        #expect(Spending.spentMinor(txs) == 320_000)
+        #expect(Spending.incomeMinor(txs) == 550_000)
+        #expect(Spending.spentMinor([]) == 0)
+        #expect(Spending.spentMinor(txs, from: day(2026, 9, 1), to: day(2026, 9, 30)) == 318_050)
+        #expect(Spending.incomeMinor(txs, from: day(2026, 9, 1), to: day(2026, 9, 30)) == 542_000)
+        #expect(TransactionType.allCases.filter(\.takesCategory) == [.expense, .income])
+    }
+
     @Test func whereItWentKeepsTopCategoriesAndFoldsTheRestIntoOther() {
         let cats = Dictionary(uniqueKeysWithValues: BuiltInCategories.all.map { ($0.uid, $0) })
         let txs = [

@@ -112,7 +112,7 @@ struct CategoriesView: View {
     private static func monthByCategory(_ txs: [Entry], from: LocalDay, to: LocalDay) -> ([String: Int64], [String: Int]) {
         var totals: [String: Int64] = [:]
         var counts: [String: Int] = [:]
-        for tx in txs where (tx.type == .expense || tx.type == .income) && tx.occurredOn.isWithin(from, to) {
+        for tx in txs where tx.type.takesCategory && tx.occurredOn.isWithin(from, to) {
             guard let uid = tx.categoryUid else { continue }
             totals[uid, default: 0] += tx.amountMinor
             counts[uid, default: 0] += 1
@@ -178,7 +178,7 @@ struct CategoryInspector: View {
     }
 
     private func details(_ c: SpendCategory) -> some View {
-        let txs = data.transactions.values.filter { $0.categoryUid == c.uid && ($0.type == .expense || $0.type == .income) }
+        let txs = data.transactions.values.filter { $0.categoryUid == c.uid && $0.type.takesCategory }
         let months = (0..<6).reversed().map { today.yearMonth.adding(months: -$0) }
         let perMonth = months.map { m in txs.filter { $0.occurredOn.yearMonth == m }.reduce(Int64(0)) { $0 + $1.amountMinor } }
         let peak = max(perMonth.max() ?? 0, 1)

@@ -112,8 +112,8 @@ struct ExpensesView: View {
     }
 
     private func footer(_ shown: [Entry]) -> some View {
-        let out = shown.filter { $0.type == .expense }.reduce(Int64(0)) { $0 + $1.amountMinor }
-        let inn = shown.filter { $0.type == .income }.reduce(Int64(0)) { $0 + $1.amountMinor }
+        let out = Spending.spentMinor(shown)
+        let inn = Spending.incomeMinor(shown)
         return HStack(spacing: 16) {
             Text(shown.count == 1 ? "1 entry" : "\(shown.count) entries").font(.grotesk(12)).foregroundStyle(Color.kMuted)
             Spacer()

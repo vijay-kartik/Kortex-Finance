@@ -44,12 +44,22 @@ public enum Spending {
         txs.filter { $0.type == .expense && $0.occurredOn.isWithin(from, to) }
     }
 
+    /// What `txs` spent, whenever they were: for a list a screen already has.
+    public static func spentMinor(_ txs: some Sequence<Transaction>) -> Int64 {
+        txs.reduce(0) { $1.type == .expense ? $0 + $1.amountMinor : $0 }
+    }
+
+    /// What `txs` brought in, whenever they were.
+    public static func incomeMinor(_ txs: some Sequence<Transaction>) -> Int64 {
+        txs.reduce(0) { $1.type == .income ? $0 + $1.amountMinor : $0 }
+    }
+
     public static func spentMinor(_ txs: [Transaction], from: LocalDay, to: LocalDay) -> Int64 {
-        expenses(txs, from: from, to: to).reduce(0) { $0 + $1.amountMinor }
+        spentMinor(txs.lazy.filter { $0.occurredOn.isWithin(from, to) })
     }
 
     public static func incomeMinor(_ txs: [Transaction], from: LocalDay, to: LocalDay) -> Int64 {
-        txs.filter { $0.type == .income && $0.occurredOn.isWithin(from, to) }.reduce(0) { $0 + $1.amountMinor }
+        incomeMinor(txs.lazy.filter { $0.occurredOn.isWithin(from, to) })
     }
 
     public static func period(_ txs: [Transaction], from: LocalDay, to: LocalDay) -> PeriodSummary {
