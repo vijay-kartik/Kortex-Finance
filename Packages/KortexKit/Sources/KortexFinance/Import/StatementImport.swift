@@ -376,9 +376,6 @@ public enum StatementImportRules {
 
     // MARK: Reconciling with an account you have
 
-    /// How many days a statement's date may be from the entry's: cards post a few days after the purchase.
-    static let matchWindowDays = 3
-
     /// Pairs each row with the entry already in the account that it is, at most one each way, the
     /// closest pairs first. An entry matches when it moves the balance by the same amount the same way
     /// (so a card bill paid from this account, or a transfer out, matches a debit) within a few days,
@@ -403,7 +400,7 @@ public enum StatementImportRules {
                     pairs.append(Pair(row: i, tx: tx, sure: true, rank: 0, gap: gap, reason: "Imported from this statement before"))
                 } else if sameReference(row, tx) {
                     pairs.append(Pair(row: i, tx: tx, sure: true, rank: 0, gap: gap, reason: "Same reference"))
-                } else if gap <= matchWindowDays {
+                } else if gap <= Matching.windowDays {
                     switch (gap, names) {
                     case (0, .some(true)): pairs.append(Pair(row: i, tx: tx, sure: true, rank: 1, gap: gap, reason: "Same amount, day and payee"))
                     case (0, .none): pairs.append(Pair(row: i, tx: tx, sure: true, rank: 1, gap: gap, reason: "Same amount and day"))
@@ -438,6 +435,15 @@ public enum StatementImportRules {
     private static func sameReference(_ row: ImportRow, _ tx: Transaction) -> Bool {
         guard let ref = tx.sourceRef?.cleaned, ref.count >= 6 else { return false }
         return row.reference?.cleaned == ref || row.description.localizedCaseInsensitiveContains(ref)
+    }
+
+    /// How an entry of the same money fits a row, for `Matching.closest`: 0 when its details read
+    /// like it (`reads`) or it shares the row's reference, 1 when `blankFits` and it has no name and
+    /// no category to say otherwise, nil when it doesn't fit.
+    private static func rank(_ row: ImportRow, _ tx: Transaction, blankFits: Bool, reads: (String) -> Bool) -> Int? {
+        let details = [tx.merchant, tx.note].compactMap { $0 }.joined(separator: " ")
+        if reads(details) || sameReference(row, tx) { return 0 }
+        return blankFits && tx.merchant == nil && tx.categoryUid == nil ? 1 : nil
     }
 
     /// True when the row and the entry name the same payee, false when both have names that differ,
@@ -590,13 +596,12 @@ public enum StatementImportRules {
             let row = rows[i]
             let isPayment = row.kind == .cardPayment
             guard isPayment || (row.kind == .expense && row.merchant.cleaned == nil) else { continue }
-            let found = data.transactions.values.filter { tx in
-                guard tx.type == .cardPayment, !tx.isCardCredit, tx.amountMinor == row.amountMinor, !taken.contains(tx.uid),
-                      tx.toAccountUid.flatMap({ data.accounts[$0] })?.kind == .creditCard,
-                      abs(row.date.days(to: tx.occurredOn)) <= matchWindowDays else { return false }
+            let found = Matching.closest(to: row.date, amountMinor: row.amountMinor, in: data.transactions.values) { (tx: Transaction) -> Bool in
+                guard tx.type == .cardPayment, !tx.isCardCredit, !taken.contains(tx.uid),
+                      tx.toAccountUid.flatMap({ data.accounts[$0] })?.kind == .creditCard else { return false }
                 if isPayment { return row.cardUid == nil || tx.toAccountUid == row.cardUid }
                 return tx.accountUid == FinanceIds.unknownAccount
-            }.min { (abs(row.date.days(to: $0.occurredOn)), $0.uid) < (abs(row.date.days(to: $1.occurredOn)), $1.uid) }
+            }
             guard let tx = found, let cardUid = tx.toAccountUid else { continue }
             taken.insert(tx.uid)
             if !isPayment {
@@ -631,18 +636,12 @@ public enum StatementImportRules {
             colorToken: nil, archived: false, createdAtMillis: 0, updatedAtMillis: 0)] } ?? []
         for i in rows.indices where rows[i].kind == .cardPayment && rows[i].include && rows[i].match == nil {
             let row = rows[i]
-            // How each debit fits: 0 reads like this bill, 1 has nothing to say otherwise; nil doesn't fit.
-            func fit(_ tx: Transaction) -> Int? {
-                guard tx.type == .expense, tx.recurringUid == nil, tx.amountMinor == row.amountMinor, !taken.contains(tx.uid),
-                      abs(row.date.days(to: tx.occurredOn)) <= matchWindowDays,
+            let found = Matching.closest(to: row.date, amountMinor: row.amountMinor, in: data.transactions.values) { tx in
+                guard tx.type == .expense, tx.recurringUid == nil, !taken.contains(tx.uid),
                       let from = data.accounts[Balances.ledger(of: tx.accountUid, in: data.accounts)], !from.kind.isCard
                 else { return nil }
-                let details = [tx.merchant, tx.note].compactMap { $0 }.joined(separator: " ")
-                if looksLikeCardBill(details, cards: probe) || sameReference(row, tx) { return 0 }
-                return tx.merchant == nil && tx.categoryUid == nil ? 1 : nil
+                return rank(row, tx, blankFits: true) { looksLikeCardBill($0, cards: probe) }
             }
-            let found = data.transactions.values.compactMap { tx in fit(tx).map { (tx, $0) } }
-                .min { ($0.1, abs(row.date.days(to: $0.0.occurredOn)), $0.0.uid) < ($1.1, abs(row.date.days(to: $1.0.occurredOn)), $1.0.uid) }?.0
             guard let tx = found else { continue }
             taken.insert(tx.uid)
             let bank = Balances.ledger(of: tx.accountUid, in: data.accounts)
@@ -706,19 +705,13 @@ public enum StatementImportRules {
             guard row.kind == .expense || row.kind == .income || row.kind.isTransfer else { continue }
             let flagged = row.kind.isTransfer || (row.id < hints.count && hints[row.id])
             let other: TransactionType = row.kind.isMoneyIn ? .expense : .income
-            // How each entry fits: 0 names this account or shares the reference, 1 has nothing to say otherwise.
-            func fit(_ tx: Transaction) -> Int? {
+            let found = Matching.closest(to: row.date, amountMinor: row.amountMinor, in: data.transactions.values) { tx in
                 let ledger = Balances.ledger(of: tx.accountUid, in: data.accounts)
-                guard tx.type == other, tx.recurringUid == nil, tx.amountMinor == row.amountMinor, !taken.contains(tx.uid),
-                      abs(row.date.days(to: tx.occurredOn)) <= matchWindowDays, mine.contains(ledger),
+                guard tx.type == other, tx.recurringUid == nil, !taken.contains(tx.uid), mine.contains(ledger),
                       row.transferAccountUid == nil || row.transferAccountUid == ledger
                 else { return nil }
-                let details = [tx.merchant, tx.note].compactMap { $0 }.joined(separator: " ")
-                if mentionsNumber(details, of: last4) || sameReference(row, tx) { return 0 }
-                return flagged && tx.merchant == nil && tx.categoryUid == nil ? 1 : nil
+                return rank(row, tx, blankFits: flagged) { mentionsNumber($0, of: last4) }
             }
-            let found = data.transactions.values.compactMap { tx in fit(tx).map { (tx, $0) } }
-                .min { ($0.1, abs(row.date.days(to: $0.0.occurredOn)), $0.0.uid) < ($1.1, abs(row.date.days(to: $1.0.occurredOn)), $1.0.uid) }?.0
             guard let tx = found else {
                 if flagged && !row.kind.isTransfer {
                     rows[i].otherSideMissing = true
@@ -1146,6 +1139,6 @@ public enum StatementImportRules {
     /// Whether the card already has a bill for this statement.
     public static func billExists(_ draft: StatementImport, in data: FinanceData) -> Bool {
         guard draft.intoExisting, let bill = draft.bill else { return false }
-        return data.statements.values.contains { $0.cardUid == draft.accountUid && abs($0.statementOn.days(to: bill.statementOn)) <= matchWindowDays }
+        return data.statements.values.contains { $0.cardUid == draft.accountUid && abs($0.statementOn.days(to: bill.statementOn)) <= Matching.windowDays }
     }
 }
