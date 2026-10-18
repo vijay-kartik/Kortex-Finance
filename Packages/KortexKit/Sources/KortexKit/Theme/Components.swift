@@ -181,6 +181,57 @@ extension ButtonStyle where Self == KortexButtonStyle {
     }
 }
 
+/// The Figma "Empty state": a Space Grotesk 18 medium Ink title, an optional 13pt Muted line, and an
+/// optional primary button with its shortcut hint, 10pt apart and centred in the space it's given.
+/// The hint doesn't bind the key, as with `KortexButtonStyle`.
+struct KEmptyState: View {
+    struct Action {
+        let label: String
+        var hint: String?
+        let perform: () -> Void
+    }
+
+    let title: String
+    var message: String?
+    var action: Action?
+
+    init(_ title: String, message: String? = nil, action: Action? = nil) {
+        self.title = title
+        self.message = message
+        self.action = action
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title).font(.grotesk(18, .medium)).foregroundStyle(Color.kInk)
+            if let message {
+                Text(message).font(.grotesk(13)).foregroundStyle(Color.kMuted)
+            }
+            if let action {
+                Button(action.label, action: action.perform).buttonStyle(.kortex(.primary, hint: action.hint))
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The Figma "Inspector empty": a 13pt Muted line, centred, with no icon.
+struct KInspectorPlaceholder: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.grotesk(13)).foregroundStyle(Color.kMuted)
+            .multilineTextAlignment(.center)
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 /// The Figma "Segmented": a Panel track with an Edge hairline (radius 8), the selected segment
 /// SynapseDim with a Synapse outline and label (radius 6), the others Muted. Words are Space Grotesk 12
 /// on a 28pt track; `mono` is the compact one for short or counted labels ("3M", "ALL 5"), JetBrains

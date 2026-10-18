@@ -36,9 +36,12 @@ struct RecurringView: View {
                 header
                 Hairline()
                 if all.isEmpty {
-                    Text(finance.status == .loading ? "Syncing…" : "No recurring payments yet. Add subscriptions and fixed expenses on your phone.")
-                        .font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if finance.status == .loading {
+                        KEmptyState("Syncing…")
+                    } else {
+                        KEmptyState("No recurring payments yet", message: "Add your subscriptions and fixed expenses to see what they cost each month.",
+                                    action: .init(label: "Add recurring payment") { model.sheet = .recurring(nil) })
+                    }
                 } else {
                     List(selection: $model.selectedRecurringUid) {
                         group("DUE THIS MONTH", thisMonth, data: data, today: today)
@@ -201,11 +204,7 @@ struct RecurringInspector: View {
             if let r = recurring {
                 ScrollView { details(r).padding(20) }
             } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "arrow.2.squarepath").font(.system(size: 22, weight: .light)).foregroundStyle(Color.kMuted)
-                    Text("Select a payment to see its details").font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                KInspectorPlaceholder("Select a payment to see its details")
             }
         }
         .background(Color.kSidebar)

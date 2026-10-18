@@ -25,9 +25,12 @@ struct AccountsView: View {
                               onImport: { model.chooseStatement(into: $0.uid) },
                               onEdit: { model.sheet = .account($0.uid, $0.kind) }, onDelete: { deleting = $0 })
             } else {
-                Text(finance.status == .loading ? "Syncing…" : "No accounts yet. Add one in Kortex on your phone.")
-                    .font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if finance.status == .loading {
+                    KEmptyState("Syncing…")
+                } else {
+                    KEmptyState("No accounts yet", message: "Add a bank account, cash or a wallet to follow its balance.",
+                                action: .init(label: "Add account") { model.sheet = .account(nil, .bank) })
+                }
             }
         }
         .background(Color.kVoid)

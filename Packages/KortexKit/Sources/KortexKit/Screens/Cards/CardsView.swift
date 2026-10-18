@@ -27,9 +27,12 @@ struct CardsView: View {
                         .padding(24)
                 }
             } else {
-                Text(finance.status == .loading ? "Syncing…" : "No cards yet. Add one in Kortex on your phone.")
-                    .font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if finance.status == .loading {
+                    KEmptyState("Syncing…")
+                } else {
+                    KEmptyState("No cards yet", message: "Add a credit card to follow its limit, bills and payments.",
+                                action: .init(label: "Add card") { model.sheet = .account(nil, .creditCard) })
+                }
             }
         }
         .background(Color.kVoid)

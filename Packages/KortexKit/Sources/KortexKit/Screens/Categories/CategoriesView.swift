@@ -167,11 +167,7 @@ struct CategoryInspector: View {
             if let c = category {
                 ScrollView { details(c).padding(20) }
             } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "tag").font(.system(size: 22, weight: .light)).foregroundStyle(Color.kMuted)
-                    Text("Select a category to see its details").font(.grotesk(13)).foregroundStyle(Color.kMuted)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                KInspectorPlaceholder("Select a category to see its details")
             }
         }
         .background(Color.kSidebar)
