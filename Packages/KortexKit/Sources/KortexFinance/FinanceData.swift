@@ -117,6 +117,22 @@ public struct FinanceData: Sendable {
         }
     }
 
+    /// The `count` newest entries that pass `include`, in `transactionsNewestFirst` order, from one
+    /// pass without sorting everything.
+    public func newestTransactions(_ count: Int, where include: (Transaction) -> Bool = { _ in true }) -> [Transaction] {
+        guard count > 0 else { return [] }
+        var newest: [Transaction] = []
+        newest.reserveCapacity(count + 1)
+        for tx in transactions.values where include(tx) {
+            let key = (tx.occurredOn, tx.occurredAtMillis)
+            if newest.count == count, let last = newest.last, key <= (last.occurredOn, last.occurredAtMillis) { continue }
+            let at = newest.firstIndex { key > ($0.occurredOn, $0.occurredAtMillis) } ?? newest.endIndex
+            newest.insert(tx, at: at)
+            if newest.count > count { newest.removeLast() }
+        }
+        return newest
+    }
+
     private static func merge<Row: Identifiable & Sendable>(_ rows: [RemoteRow<Row>], into map: inout [String: Row]) where Row.ID == String {
         for row in rows {
             switch row {
