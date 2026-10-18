@@ -167,13 +167,10 @@ public enum EntryRules {
         }.sorted { ($0.occurredAtMillis, $0.uid) > ($1.occurredAtMillis, $1.uid) }
     }
 
-    /// How many days apart a transfer's two sides may be recorded: banks post them a day or two apart.
-    public static let transferWindowDays = 3
-
     /// Making money out or in into a transfer (`draft`): the other account's record of the same money,
     /// which then is this transfer's other side. For money out of this account, money in to the one it
     /// went to; for money in, money out of the one it came from. The same amount within
-    /// `transferWindowDays`, not paying a recurring payment, the closest first. Nil when there's none,
+    /// `Matching.windowDays`, not paying a recurring payment, the closest first. Nil when there's none,
     /// or the edit doesn't keep the entry's own account on one end.
     public static func transferOtherSide(of uid: String, _ draft: TransactionDraft, in data: FinanceData,
                                          clock: FinanceClock = .system) -> Transaction? {
@@ -186,24 +183,22 @@ public enum EntryRules {
         else if here == ledger(toUid) { (other, recorded) = (ledger(draft.accountUid), .expense) }
         else { return nil }
         let day = clock.dayOf(draft.occurredAtMillis ?? existing.occurredAtMillis)
-        return data.transactions.values.filter { tx in
-            tx.uid != uid && tx.type == recorded && tx.recurringUid == nil && tx.amountMinor == draft.amountMinor
-                && ledger(tx.accountUid) == other && abs(day.days(to: tx.occurredOn)) <= transferWindowDays
-        }.min { (abs(day.days(to: $0.occurredOn)), $0.uid) < (abs(day.days(to: $1.occurredOn)), $1.uid) }
+        return Matching.closest(to: day, amountMinor: draft.amountMinor, in: data.transactions.values) { tx in
+            tx.uid != uid && tx.type == recorded && tx.recurringUid == nil && ledger(tx.accountUid) == other
+        }
     }
 
     /// Making an entry a card bill payment from one of your accounts: the payment the card already has
     /// from an unknown account (its statement imported before this bank's), for the same amount within
-    /// `transferWindowDays`, which then is this one. Nil when there's none.
+    /// `Matching.windowDays`, which then is this one. Nil when there's none.
     public static func cardPaymentOtherSide(of uid: String, _ draft: TransactionDraft, in data: FinanceData,
                                             clock: FinanceClock = .system) -> Transaction? {
         guard draft.type == .cardPayment, let cardUid = draft.toAccountUid, data.accounts[draft.accountUid] != nil,
               let existing = data.transactions[uid] else { return nil }
         let day = clock.dayOf(draft.occurredAtMillis ?? existing.occurredAtMillis)
-        return data.transactions.values.filter { tx in
+        return Matching.closest(to: day, amountMinor: draft.amountMinor, in: data.transactions.values) { tx in
             tx.uid != uid && tx.type == .cardPayment && tx.accountUid == FinanceIds.unknownAccount && tx.toAccountUid == cardUid
-                && tx.amountMinor == draft.amountMinor && abs(day.days(to: tx.occurredOn)) <= transferWindowDays
-        }.min { (abs(day.days(to: $0.occurredOn)), $0.uid) < (abs(day.days(to: $1.occurredOn)), $1.uid) }
+        }
     }
 
     /// Edits an entry and, when the money it now moves between your accounts is already recorded on

@@ -216,3 +216,21 @@ struct LedgerIndexTests {
         expectMatchesScans(data, accounts)
     }
 }
+
+struct MatchingTests {
+    @Test func closestSameAmountWithinTheWindowByRankThenGapThenUid() {
+        let on = day(2026, 10, 10)
+        let txs = [
+            tx("far", .expense, 500, on: day(2026, 10, 14)),
+            tx("other", .expense, 600, on: on),
+            tx("b", .expense, 500, on: day(2026, 10, 8)),
+            tx("a", .expense, 500, on: day(2026, 10, 12)),
+            tx("c", .expense, 500, on: day(2026, 10, 13)),
+        ]
+        #expect(Matching.closest(to: on, amountMinor: 500, in: txs, where: { _ in true })?.uid == "a", "a and b are 2 days off; a sorts first")
+        #expect(Matching.closest(to: on, amountMinor: 500, in: txs, where: { $0.uid != "a" })?.uid == "b")
+        #expect(Matching.closest(to: on, amountMinor: 500, in: txs) { $0.uid == "c" ? 0 : 1 }?.uid == "c", "a lower rank beats a closer day")
+        #expect(Matching.closest(to: on, amountMinor: 500, in: txs, where: { $0.uid == "far" }) == nil, "4 days is outside the window")
+        #expect(Matching.closest(to: on, amountMinor: 700, in: txs, where: { _ in true }) == nil)
+    }
+}
