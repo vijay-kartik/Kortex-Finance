@@ -35,6 +35,9 @@ public enum TransactionType: String, Sendable, CaseIterable {
     case transfer = "TRANSFER"
     /// Paying a credit card's bill from an account. Never spending: the purchases already were.
     case cardPayment = "CARD_PAYMENT"
+
+    /// Only expenses and income are filed under a category; the others move money between your own accounts.
+    public var takesCategory: Bool { self == .expense || self == .income }
 }
 
 public enum TransactionSource: String, Sendable, CaseIterable {

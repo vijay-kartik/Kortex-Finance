@@ -156,7 +156,7 @@ public enum EntryRules {
     /// under another category than the draft's, newest first: the ones the edit offers to refile. The
     /// payee is told by name, or by the key the entry already had when its name is kept.
     public static func samePayee(as uid: String, _ draft: TransactionDraft, in data: FinanceData) -> [Transaction] {
-        guard draft.type == .expense || draft.type == .income, let name = draft.merchant?.cleaned else { return [] }
+        guard draft.type.takesCategory, let name = draft.merchant?.cleaned else { return [] }
         let existing = data.transactions[uid]
         let kept = existing?.merchant == name ? existing?.payeeKey : nil
         let keys = Set([FinanceIds.payeeKey(name), kept].compactMap { $0 }.filter { !$0.isEmpty })

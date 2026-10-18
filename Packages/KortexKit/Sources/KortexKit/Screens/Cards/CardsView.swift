@@ -240,8 +240,7 @@ struct CardDetail: View {
 
     private func debitOverview(txs: [Entry], today: LocalDay) -> some View {
         let month = today.yearMonth
-        let spent = txs.filter { $0.type == .expense && $0.accountUid == card.uid && $0.occurredOn.isWithin(month.firstDay, today) }
-            .reduce(Int64(0)) { $0 + $1.amountMinor }
+        let spent = Spending.spentMinor(txs.filter { $0.accountUid == card.uid }, from: month.firstDay, to: today)
         return KCard(spacing: 14) {
             Text("Debit card").font(.grotesk(16, .medium)).foregroundStyle(Color.kInk)
             figure("Spent with this card in \(Format.monthName(month))", Money.format(spent))

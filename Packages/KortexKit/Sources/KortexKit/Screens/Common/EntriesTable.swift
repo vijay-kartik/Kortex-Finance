@@ -42,7 +42,7 @@ struct EntriesTable: View {
             .width(min: 120, ideal: 200)
 
             TableColumn("Category") { tx in
-                if tx.type == .expense || tx.type == .income {
+                if tx.type.takesCategory {
                     CategoryLabel(category: EntryFormat.category(tx, data))
                 } else {
                     Text(EntryFormat.kind(tx)).font(.grotesk(12)).foregroundStyle(Color.kMuted)
