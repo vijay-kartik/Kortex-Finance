@@ -153,6 +153,75 @@ struct CalcTests {
         #expect(Pending.urgency(day(2026, 10, 15), today: today) == .later)
         #expect(Pending.urgency(day(2026, 9, 28), today: today) == .overdue)
     }
+
+    /// Entries across a year boundary, every type, and days at both ends of short and long months.
+    private static let history: [Transaction] = [
+        tx("o", .opening, 100_000, on: day(2025, 10, 1)),
+        tx("i1", .income, 500_000, on: day(2025, 11, 1)),
+        tx("e1", .expense, 1_200, on: day(2025, 11, 30)),
+        tx("e2", .expense, 3_400, on: day(2025, 12, 31)),
+        tx("t", .transfer, 9_999, on: day(2026, 1, 1)),
+        tx("e3", .expense, 700, on: day(2026, 1, 1)),
+        tx("e4", .expense, 800, on: day(2026, 1, 1)),
+        tx("i2", .income, 250_000, on: day(2026, 2, 1)),
+        tx("e5", .expense, 2_500, on: day(2026, 2, 28)),
+        tx("p", .cardPayment, 40_000, on: day(2026, 3, 5)),
+        tx("e6", .expense, 600, on: day(2026, 3, 9)),
+        tx("e7", .expense, 4_100, on: day(2026, 3, 10)),
+        tx("e8", .expense, 999, on: day(2026, 3, 31)),
+        tx("e9", .expense, 50_000, on: day(2026, 4, 1)),
+    ]
+
+    @Test func singlePassMonthlyFlowsMatchEachMonthsSummary() {
+        let txs = Self.history
+        for months in [1, 3, 6, 12] {
+            let flows = Spending.monthlyFlows(txs, endMonth: YearMonth(year: 2026, month: 3), months: months)
+            #expect(flows.map(\.month) == (0..<months).reversed().map { YearMonth(year: 2026, month: 3).adding(months: -$0) })
+            for flow in flows {
+                let summary = Spending.month(txs, flow.month)
+                #expect(flow.inMinor == summary.incomeMinor)
+                #expect(flow.outMinor == summary.spentMinor)
+            }
+        }
+        #expect(Spending.monthlyFlows(txs, endMonth: YearMonth(year: 2026, month: 3), months: 0).isEmpty)
+    }
+
+    @Test func singlePassSpendByDayMatchesEachDaysSpend() {
+        let txs = Self.history
+        for (month, through) in [(YearMonth(year: 2026, month: 3), 31), (YearMonth(year: 2026, month: 3), 9),
+                                 (YearMonth(year: 2026, month: 2), nil), (YearMonth(year: 2026, month: 1), 1)] {
+            let byDay = Spending.spentByDay(txs, month: month, throughDay: through)
+            #expect(byDay == (1...(through ?? month.lengthOfMonth)).map { Spending.spentMinor(txs, from: month.day($0), to: month.day($0)) })
+            let cumulative = Spending.cumulativeByDay(txs, month: month, throughDay: through)
+            #expect(cumulative == byDay.indices.map { Spending.spentMinor(txs, from: month.firstDay, to: month.day($0 + 1)) })
+        }
+        #expect(Spending.spentByDay(txs, month: YearMonth(year: 2026, month: 3), throughDay: 0).isEmpty)
+    }
+
+    @Test func dashboardFiguresMatchTheScans() {
+        var data = FinanceData()
+        data.apply(Self.history.map { RemoteRow.live($0) })
+        let txs = Self.history
+        // The 31st clamps last month to its 28th; the 10th doesn't.
+        for today in [day(2026, 3, 31), day(2026, 3, 10), day(2026, 4, 1)] {
+            let model = DashboardModel(data: data, today: today)
+            #expect(model.monthToDate == Spending.monthToDate(txs, today: today))
+            #expect(model.flows == Spending.monthlyFlows(txs, endMonth: today.yearMonth, months: 12))
+            #expect(model.pace?.thisMonth == Spending.cumulativeByDay(txs, month: today.yearMonth, throughDay: today.day))
+            #expect(model.pace?.projectedMinor == Spending.projectedMonthEndMinor(txs, today: today))
+            #expect(model.recent.map(\.uid) == data.transactionsNewestFirst.filter { $0.type != .opening }.prefix(5).map(\.uid))
+        }
+    }
+
+    @Test func newestTransactionsKeepTheNewestInOrder() {
+        var data = FinanceData()
+        data.apply(Self.history.filter { !["e3", "e4", "t"].contains($0.uid) }.map { RemoteRow.live($0) })
+        let all = data.transactionsNewestFirst
+        for count in [0, 1, 3, all.count, all.count + 2] {
+            #expect(data.newestTransactions(count).map(\.uid) == all.prefix(count).map(\.uid))
+        }
+        #expect(data.newestTransactions(3) { $0.type == .income }.map(\.uid) == ["i2", "i1"])
+    }
 }
 
 struct LedgerIndexTests {

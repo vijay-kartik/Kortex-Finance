@@ -16,6 +16,11 @@ public struct PeriodSummary: Sendable, Hashable {
     public let spentMinor: Int64
     public let incomeMinor: Int64
 
+    public init(spentMinor: Int64, incomeMinor: Int64) {
+        self.spentMinor = spentMinor
+        self.incomeMinor = incomeMinor
+    }
+
     public var savingsMinor: Int64 { incomeMinor - spentMinor }
     public var savingsRate: Double? { incomeMinor > 0 ? Double(savingsMinor) / Double(incomeMinor) : nil }
 }
@@ -60,13 +65,18 @@ public enum Spending {
         period(txs, from: month.firstDay, to: month.lastDay)
     }
 
-    /// The Cash flow chart: `months` months ending with `endMonth`, oldest first.
+    /// The Cash flow chart: `months` months ending with `endMonth`, oldest first. One pass over `txs`.
     public static func monthlyFlows(_ txs: [Transaction], endMonth: YearMonth, months: Int = 6) -> [MonthFlow] {
-        (0..<months).reversed().map { back in
-            let m = endMonth.adding(months: -back)
-            let summary = month(txs, m)
-            return MonthFlow(month: m, inMinor: summary.incomeMinor, outMinor: summary.spentMinor)
+        let count = max(months, 0)
+        guard count > 0 else { return [] }
+        let start = endMonth.adding(months: -(count - 1))
+        var inMinor = [Int64](repeating: 0, count: count), outMinor = [Int64](repeating: 0, count: count)
+        for tx in txs where tx.type == .expense || tx.type == .income {
+            let i = (tx.occurredOn.year - start.year) * 12 + (tx.occurredOn.month - start.month)
+            guard i >= 0, i < count else { continue }
+            if tx.type == .expense { outMinor[i] += tx.amountMinor } else { inMinor[i] += tx.amountMinor }
         }
+        return (0..<count).map { i in MonthFlow(month: start.adding(months: i), inMinor: inMinor[i], outMinor: outMinor[i]) }
     }
 
     /// Days 1…N of this month against days 1…min(N, its length) of last month, N being today's day.
@@ -79,21 +89,34 @@ public enum Spending {
         )
     }
 
-    /// Spending so far by the end of each day of `month`, days 1…`throughDay` (Pace vs last month).
-    public static func cumulativeByDay(_ txs: [Transaction], month: YearMonth, throughDay: Int? = nil) -> [Int64] {
+    /// Spending on each day of `month`, days 1…`throughDay` (Spending by day). One pass over `txs`.
+    public static func spentByDay(_ txs: [Transaction], month: YearMonth, throughDay: Int? = nil) -> [Int64] {
         let days = min(max(throughDay ?? month.lengthOfMonth, 0), month.lengthOfMonth)
         var perDay = [Int64](repeating: 0, count: days)
-        for tx in expenses(txs, from: month.firstDay, to: month.lastDay) where tx.occurredOn.day - 1 < days {
+        for tx in txs where tx.type == .expense && tx.occurredOn.year == month.year && tx.occurredOn.month == month.month
+            && tx.occurredOn.day - 1 < days {
             perDay[tx.occurredOn.day - 1] += tx.amountMinor
         }
+        return perDay
+    }
+
+    /// Spending so far by the end of each day of `month`, days 1…`throughDay` (Pace vs last month).
+    public static func cumulativeByDay(_ txs: [Transaction], month: YearMonth, throughDay: Int? = nil) -> [Int64] {
+        runningTotals(spentByDay(txs, month: month, throughDay: throughDay))
+    }
+
+    static func runningTotals(_ perDay: [Int64]) -> [Int64] {
         var running: Int64 = 0
         return perDay.map { running += $0; return running }
     }
 
     /// "At this pace, month ends near ₹3,290": spent so far ÷ days gone × days in the month.
     public static func projectedMonthEndMinor(_ txs: [Transaction], today: LocalDay) -> Int64 {
-        let spent = spentMinor(txs, from: today.yearMonth.firstDay, to: today)
-        return roundDiv(spent * Int64(today.yearMonth.lengthOfMonth), Int64(today.day))
+        projectedMonthEndMinor(spentMinor: spentMinor(txs, from: today.yearMonth.firstDay, to: today), today: today)
+    }
+
+    static func projectedMonthEndMinor(spentMinor spent: Int64, today: LocalDay) -> Int64 {
+        roundDiv(spent * Int64(today.yearMonth.lengthOfMonth), Int64(today.day))
     }
 
     /// Where it went: the `top` biggest categories by spend, then Other for the rest and

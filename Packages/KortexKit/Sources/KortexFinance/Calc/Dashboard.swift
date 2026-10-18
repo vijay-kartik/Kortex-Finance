@@ -45,17 +45,20 @@ public struct DashboardModel: Sendable {
         accountCount = data.accounts.values.filter { $0.kind.countsInTotal && !$0.archived }.count
         pending = Pending.summary(today: today, statements: Array(data.statements.values), recurring: Array(data.recurring.values), transactions: txs)
         self.flows = flows
-        monthToDate = Spending.monthToDate(txs, today: today)
         keptPercent = current.keptPercent
         keptChange = current.keptPercent.flatMap { kept in previous.keptPercent.map { kept - $0 } }
 
-        let thisCumulative = Spending.cumulativeByDay(txs, month: month, throughDay: today.day)
+        // Month to date and Pace come from the same two per-day passes.
+        let thisCumulative = Spending.runningTotals(Spending.spentByDay(txs, month: month, throughDay: today.day))
         let lastCumulative = Spending.cumulativeByDay(txs, month: lastMonth)
-        pace = (thisCumulative.last ?? 0) > 0 || (lastCumulative.last ?? 0) > 0
+        let thisMonthMinor = thisCumulative.last ?? 0
+        let lastMonthMinor = lastCumulative[min(today.day, lastCumulative.count) - 1]
+        monthToDate = MonthToDate(day: today.day, thisMonthMinor: thisMonthMinor, lastMonthMinor: lastMonthMinor)
+        pace = thisMonthMinor > 0 || (lastCumulative.last ?? 0) > 0
             ? Pace(thisMonth: thisCumulative, lastMonth: lastCumulative, daysInMonth: month.lengthOfMonth,
-                   projectedMinor: Spending.projectedMonthEndMinor(txs, today: today))
+                   projectedMinor: Spending.projectedMonthEndMinor(spentMinor: thisMonthMinor, today: today))
             : nil
         shares = Spending.whereItWent(txs, categories: data.categories, from: month.firstDay, to: today)
-        recent = Array(data.transactionsNewestFirst.lazy.filter { $0.type != .opening }.prefix(5))
+        recent = data.newestTransactions(5) { $0.type != .opening }
     }
 }

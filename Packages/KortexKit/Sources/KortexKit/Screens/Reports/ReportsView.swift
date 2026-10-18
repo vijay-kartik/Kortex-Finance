@@ -100,10 +100,8 @@ struct Report {
             title = String(period.year)
             previousName = String(period.year - 1)
             let monthsShown = period.year == today.year ? today.month : 12
-            buckets = (1...monthsShown).map { m in
-                let ym = YearMonth(year: period.year, month: m)
-                return (Format.monthShort(ym), Spending.spentMinor(txs, from: ym.firstDay, to: ym.lastDay))
-            }
+            buckets = Spending.monthlyFlows(txs, endMonth: YearMonth(year: period.year, month: monthsShown), months: monthsShown)
+                .map { (Format.monthShort($0.month), $0.outMinor) }
         } else {
             let month = period.month
             from = month.firstDay
@@ -112,10 +110,12 @@ struct Report {
             prevTo = month.adding(months: -1).lastDay
             title = month.date.formatted(.dateTime.month(.wide).year())
             previousName = Format.monthName(month.adding(months: -1))
-            buckets = (1...to.day).map { d in ("\(d)", Spending.spentMinor(txs, from: month.day(d), to: month.day(d))) }
+            buckets = Spending.spentByDay(txs, month: month, throughDay: to.day).enumerated().map { i, minor in ("\(i + 1)", minor) }
         }
-        summary = Spending.period(txs, from: from, to: to)
-        shares = Spending.whereItWent(txs, categories: data.categories, from: from, to: to)
+        // The period's expenses, filtered once for the summary, Where it went and Largest entries.
+        let spent = Spending.expenses(txs, from: from, to: to)
+        summary = PeriodSummary(spentMinor: spent.reduce(0) { $0 + $1.amountMinor }, incomeMinor: Spending.incomeMinor(txs, from: from, to: to))
+        shares = Spending.whereItWent(spent, categories: data.categories, from: from, to: to)
         var prev: [String: Int64] = [:]
         let shownUids = Set(shares.compactMap { $0.category?.uid })
         for tx in Spending.expenses(txs, from: prevFrom, to: prevTo) {
@@ -123,7 +123,7 @@ struct Report {
             prev[key, default: 0] += tx.amountMinor
         }
         previousByCategory = prev
-        largest = Array(Spending.expenses(txs, from: from, to: to).sorted { $0.amountMinor > $1.amountMinor }.prefix(5))
+        largest = Array(spent.sorted { $0.amountMinor > $1.amountMinor }.prefix(5))
     }
 
     var savingsPercent: Int? { summary.savingsRate.map { Int(($0 * 100).rounded()) } }
