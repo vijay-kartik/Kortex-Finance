@@ -200,7 +200,7 @@ struct StatementImportSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("BILL ON THIS STATEMENT").sectionLabelStyle()
                     LabeledContent("Total due", value: Money.format(bill.totalMinor))
-                    LabeledContent("Minimum", value: Money.format(bill.minMinor))
+                    LabeledContent(bill.minEstimated ? "Minimum (estimated)" : "Minimum", value: Money.format(bill.minMinor))
                     LabeledContent("Due on", value: Format.dueDay(bill.dueOn))
                     Text(StatementImportRules.billExists(current, in: finance.data)
                          ? "Kortex already has this bill, so it's left as it is."

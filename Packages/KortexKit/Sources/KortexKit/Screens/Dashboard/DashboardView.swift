@@ -234,7 +234,7 @@ struct PendingCard: View {
     private func subtitle(_ item: PendingItem) -> String {
         switch item.kind {
         case .cardBill:
-            return item.minDueMinor.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
+            return item.minDueMinor.flatMap { $0 > 0 ? $0 : nil }.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
         case .subscription, .fixed:
             let kind = item.kind == .subscription ? "Subscription" : "Fixed"
             let frequency = data.recurring[item.sourceUid].map { r -> String in
