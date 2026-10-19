@@ -81,21 +81,23 @@ public struct NewEntryCommands: Commands {
     public var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Group {
-                Button("New Expense") { model.sheet = .newEntry(.expense) }
+                Button("New Expense") { model.present(.newEntry(.expense)) }
                     .keyboardShortcut("n", modifiers: .command)
-                Button("New Income") { model.sheet = .newEntry(.income) }
+                Button("New Income") { model.present(.newEntry(.income)) }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
-                Button("New Transfer") { model.sheet = .newEntry(.transfer) }
+                Button("New Transfer") { model.present(.newEntry(.transfer)) }
                 Divider()
                 Button("Scan Receipt…") { model.chooseReceipt() }
                     .keyboardShortcut("o", modifiers: .command)
                 Divider()
-                Button("New Recurring Payment…") { model.sheet = .recurring(nil) }
-                Button("New Account or Card…") { model.sheet = .account(nil, .bank) }
+                Button("New Recurring Payment…") { model.present(.recurring(nil)) }
+                Button("New Account or Card…") { model.present(.account(nil, .bank)) }
                 Button("Import Statement…") { model.chooseStatement() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
             }
-            .disabled(!enabled)
+            // Off while a sheet is showing too: the main menu still takes these shortcuts then, and
+            // a new sheet would replace the open one and lose what's in it.
+            .disabled(!enabled || model.sheet != nil)
         }
     }
 }

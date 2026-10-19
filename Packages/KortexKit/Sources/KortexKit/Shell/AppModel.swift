@@ -33,23 +33,31 @@ public final class AppModel {
         if self.sheet == sheet { self.sheet = nil }
     }
 
+    /// Shows `sheet` unless one is already showing, so a menu shortcut pressed over an open sheet
+    /// can't throw away what's in it.
+    public func present(_ sheet: Sheet) {
+        if self.sheet == nil { self.sheet = sheet }
+    }
+
     /// File › Scan Receipt…: pick a photo or PDF in the open panel.
     public func chooseReceipt() {
+        guard sheet == nil else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image, .pdf]
         panel.allowsMultipleSelection = false
         panel.message = "Choose a receipt photo or PDF"
-        if panel.runModal() == .OK, let url = panel.url { sheet = .receipt(url) }
+        if panel.runModal() == .OK, let url = panel.url { present(.receipt(url)) }
     }
 
     /// File › Import Statement…: pick the statement PDF (or a photo of it). From an account's or card's
     /// own Import statement…, its entries go there; otherwise into the account it's for, or a new one.
     public func chooseStatement(into accountUid: String? = nil) {
+        guard sheet == nil else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf, .image]
         panel.allowsMultipleSelection = false
         panel.message = "Choose a bank or credit card statement"
-        if panel.runModal() == .OK, let url = panel.url { sheet = .statement(url, into: accountUid) }
+        if panel.runModal() == .OK, let url = panel.url { present(.statement(url, into: accountUid)) }
     }
 
     /// Opens an account or card from the sidebar.
