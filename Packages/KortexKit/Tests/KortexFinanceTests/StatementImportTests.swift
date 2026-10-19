@@ -341,6 +341,34 @@ struct StatementImportTests {
         #expect(again.rows[1].match?.reason == "Imported from this statement before")
     }
 
+    private func cardWithoutMinimum(statementOn: String, total: Double) -> ExtractedAccount {
+        ExtractedAccount(kind: .credit_card, institution: "Test Bank", productName: "Platinum", numberLast4: "4321", ifsc: nil,
+                         holder: nil, currency: "INR", periodStart: nil, periodEnd: nil, statementDate: statementOn,
+                         openingBalance: 0, openingBalanceIsDebit: true, closingBalance: total, closingBalanceIsDebit: true,
+                         creditLimit: nil, totalDue: total, minimumDue: nil, paymentDueDate: "2026-11-04",
+                         transactions: [tx("2026-10-02", "AMAZON", total, .debit, balance: total, merchant: "Amazon")])
+    }
+
+    private func savedBill(_ writes: [RecordWrite]) -> CardStatement? {
+        writes.compactMap { if case .statement(let b) = $0 { b } else { nil } }.first
+    }
+
+    @Test func aBillWithoutAMinimumOrStartIsDatedAndEstimatedAsThePhoneWould() throws {
+        let s = StatementImportRules.prepare(cardWithoutMinimum(statementOn: "2026-10-15", total: 1_400), in: FinanceData(), today: today)
+        #expect(s.bill?.minMinor == 20_000 && s.bill?.minEstimated == true, "5% is ₹70, so the ₹200 floor applies")
+        let b = try #require(savedBill(StatementImportRules.commit(s, in: FinanceData(), clock: clock).get().writes))
+        #expect(b.minDueMinor == Statements.defaultMinDueMinor(b.totalDueMinor) && b.minDueMinor == 20_000)
+        #expect(b.periodStart == day("2026-09-16"), "the day after last month's statement day")
+    }
+
+    @Test func aBillWithoutAStartBeginsTheDayAfterTheCardsPreviousBill() throws {
+        let data = twoCards()
+        let s = StatementImportRules.prepare(cardWithoutMinimum(statementOn: "2026-09-25", total: 200_000), into: "card", in: data, today: today)
+        #expect(s.bill?.minMinor == 10_000_00)
+        let b = try #require(savedBill(StatementImportRules.commit(s, in: data, clock: clock).get().writes))
+        #expect(b.periodStart == day("2026-08-26"))
+    }
+
     @Test func aCardsBillIsNotAddedTwice() throws {
         var data = existingBank([])
         data.apply([RemoteRow.live(CardStatement(uid: "phone", cardUid: "card", periodStart: day("2026-08-26"), statementOn: day("2026-09-24"),

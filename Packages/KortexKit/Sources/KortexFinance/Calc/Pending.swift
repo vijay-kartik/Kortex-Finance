@@ -1,5 +1,9 @@
 /// Credit card bills: what's paid and what's left, as kortex's calc/Statements.kt.
 public enum Statements {
+    /// Until an SMS or an edit gives the bank's figure: 5% of the bill, at least ₹200, never more than the bill.
+    public static let minDueFloorMinor: Int64 = 200_00
+    public static let minDuePercent: Int64 = 5
+
     public static func paidMinor(_ statement: CardStatement, _ txs: [Transaction]) -> Int64 {
         txs.filter { $0.type == .cardPayment && $0.statementUid == statement.uid }.reduce(0) { $0 + $1.amountMinor }
     }
@@ -12,6 +16,10 @@ public enum Statements {
     /// unpaid on it was still owed on the next statement day, so the newer bill includes it.
     public static func latestPerCard(_ statements: [CardStatement]) -> [CardStatement] {
         Dictionary(grouping: statements, by: \.cardUid).values.compactMap { $0.max { $0.statementOn < $1.statementOn } }
+    }
+
+    public static func defaultMinDueMinor(_ totalDueMinor: Int64) -> Int64 {
+        min(max(roundDiv(totalDueMinor * minDuePercent, 100), minDueFloorMinor), totalDueMinor)
     }
 }
 

@@ -158,6 +158,8 @@ public struct ImportBill: Sendable, Hashable {
     public var totalMinor: Int64
     public var minMinor: Int64
     public var periodStart: LocalDay?
+    /// The statement gave no minimum, so `minMinor` is the phone's default, not the bank's figure.
+    public var minEstimated = false
 }
 
 /// What will be added: the account (editable) and its reviewed entries.
@@ -352,8 +354,10 @@ public enum StatementImportRules {
             draft.statementDay = statementOn?.day
             draft.dueDay = dueOn?.day
             if let statementOn, let dueOn, let total = extracted.totalDue, total > 0 {
-                bill = ImportBill(statementOn: statementOn, dueOn: dueOn, totalMinor: minor(total),
-                                  minMinor: extracted.minimumDue.map(minor) ?? 0, periodStart: parseDay(extracted.periodStart))
+                let totalMinor = minor(total)
+                bill = ImportBill(statementOn: statementOn, dueOn: dueOn, totalMinor: totalMinor,
+                                  minMinor: extracted.minimumDue.map(minor) ?? Statements.defaultMinDueMinor(totalMinor),
+                                  periodStart: parseDay(extracted.periodStart), minEstimated: extracted.minimumDue == nil)
             }
         }
         let firstDay = rows.map(\.date).min()
@@ -1117,9 +1121,16 @@ public enum StatementImportRules {
 
         // A card you have may already have this bill, from the phone or an earlier import.
         if let bill = draft.bill, !billExists(draft, in: data) {
+            // Without a printed start, as the phone's engine dates its bills: the day after the card's
+            // previous statement, else the day after last month's statement day.
+            let previousOn = data.statements.values.filter { $0.cardUid == draft.accountUid && $0.statementOn < bill.statementOn }
+                .map(\.statementOn).max()
+            let statementDay = working.accounts[draft.accountUid]?.statementDay ?? bill.statementOn.day
+            let periodStart = bill.periodStart ?? previousOn?.adding(days: 1)
+                ?? bill.statementOn.yearMonth.adding(months: -1).day(statementDay).adding(days: 1)
             writes.append(.statement(CardStatement(
                 uid: FinanceIds.statement(cardUid: draft.accountUid, statementOn: bill.statementOn), cardUid: draft.accountUid,
-                periodStart: bill.periodStart ?? bill.statementOn.adding(days: -30), statementOn: bill.statementOn, dueOn: bill.dueOn,
+                periodStart: periodStart, statementOn: bill.statementOn, dueOn: bill.dueOn,
                 totalDueMinor: bill.totalMinor, minDueMinor: bill.minMinor, source: .manual, createdAtMillis: now, updatedAtMillis: now
             )))
         }

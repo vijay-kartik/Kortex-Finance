@@ -133,6 +133,12 @@ struct CalcTests {
         #expect(RecurringSchedule.nextAfter(rent, day(2026, 9, 30)) == day(2026, 10, 31))
     }
 
+    @Test func minimumDueIsFivePercentWithAFloorNeverAboveTheBill() {
+        #expect(Statements.defaultMinDueMinor(1_00_000_00) == 5_000_00)
+        #expect(Statements.defaultMinDueMinor(1_400_00) == 200_00)
+        #expect(Statements.defaultMinDueMinor(100_00) == 100_00)
+    }
+
     @Test func pendingSkipsPaidOccurrencesAndPaidBills() {
         let today = day(2026, 9, 29)
         let netflix = monthly("netflix", anchor: 3, next: day(2026, 10, 3))
