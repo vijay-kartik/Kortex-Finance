@@ -63,13 +63,18 @@ struct CardDetail: View {
     var onDelete: (() -> Void)?
 
     var body: some View {
-        let txs = Array(data.transactions.values)
+        // The card's entries, from its ledger in the index rather than every transaction. A debit card's
+        // ledger is its bank's when linked, so only those made with the card itself are kept.
+        let ledger = data.ledgerEntries(of: card)
+        let txs = card.kind == .creditCard ? ledger : ledger.filter { $0.accountUid == card.uid || $0.toAccountUid == card.uid }
+        // Each bill's payments, grouped once so a statement's figures only look at its own.
+        let payments = card.kind == .creditCard ? Dictionary(grouping: txs.filter { $0.type == .cardPayment }, by: \.statementUid) : [:]
         let today = LocalDay.today()
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
                 CardFace(card: card).frame(width: 420, height: 250)
                 if card.kind == .creditCard {
-                    creditOverview(txs: txs, today: today)
+                    creditOverview(txs: txs, payments: payments, today: today)
                 } else {
                     debitOverview(txs: txs, today: today)
                 }
@@ -77,7 +82,7 @@ struct CardDetail: View {
             .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 16) {
                 details.frame(width: 420)
-                if card.kind == .creditCard { statements(txs: txs, today: today) } else { recent(txs: txs) }
+                if card.kind == .creditCard { statements(payments: payments, today: today) } else { recent(txs: txs) }
             }
             .fixedSize(horizontal: false, vertical: true)
             entries(txs: txs)
@@ -87,10 +92,7 @@ struct CardDetail: View {
     /// Every entry on the card, in the same table as Expenses, with its right-click menu. A credit card's
     /// are what moves what it owes: purchases, bill payments, refunds. A debit card's are those made
     /// with it (its money moves on its bank, whose page has the rest).
-    private func entries(txs: [Entry]) -> some View {
-        let list = card.kind == .creditCard
-            ? txs.filter { Balances.touches($0, card, accounts: data.accounts) }
-            : txs.filter { $0.accountUid == card.uid || $0.toAccountUid == card.uid }
+    private func entries(txs list: [Entry]) -> some View {
         // A table sizes to what it's given; in this scrolling page it's given a height for its rows.
         let height = min(max(CGFloat(list.count) * 28 + 34, 120), 520)
         return VStack(spacing: 0) {
@@ -110,10 +112,11 @@ struct CardDetail: View {
 
     // MARK: Credit
 
-    private func creditOverview(txs: [Entry], today: LocalDay) -> some View {
-        let position = Balances.cardPosition(card, transactions: txs, accounts: data.accounts)
+    private func creditOverview(txs: [Entry], payments: [String?: [Entry]], today: LocalDay) -> some View {
+        let position = Balances.cardPosition(card, outstandingMinor: data.balanceMinor(of: card))
         let statement = Statements.latest(for: card.uid, in: Array(data.statements.values))
-        let unpaid = statement.map { Statements.unpaidMinor($0, txs) } ?? 0
+        let paid = statement.map { Statements.paidMinor($0, payments[$0.uid] ?? []) } ?? 0
+        let unpaid = statement.map { max($0.totalDueMinor - paid, 0) } ?? 0
         let spentSince = statement.map { Statements.spentSinceMinor(card, $0, txs, accounts: data.accounts) }
         let daysToDue = statement.map { today.days(to: $0.dueOn) }
         return KCard(spacing: 14) {
@@ -141,7 +144,7 @@ struct CardDetail: View {
                             .font(.grotesk(12)).foregroundStyle(Color.kMuted)
                         Text(Money.format(unpaid)).font(.grotesk(32, .medium)).foregroundStyle(Color.kInk)
                         if unpaid > 0 {
-                            Text("Minimum \(Money.format(max(statement.minDueMinor - Statements.paidMinor(statement, txs), 0)))")
+                            Text("Minimum \(Money.format(max(statement.minDueMinor - paid, 0)))")
                                 .font(.grotesk(12)).foregroundStyle(Color.kMuted)
                         }
                     }
@@ -186,7 +189,7 @@ struct CardDetail: View {
         }
     }
 
-    private func statements(txs: [Entry], today: LocalDay) -> some View {
+    private func statements(payments: [String?: [Entry]], today: LocalDay) -> some View {
         let list = data.statements.values.filter { $0.cardUid == card.uid }.sorted { $0.statementOn > $1.statementOn }
         return KCard(spacing: 0) {
             CardHeader(title: "Statements") {
@@ -213,7 +216,7 @@ struct CardDetail: View {
                             Text(Money.format(s.totalDueMinor)).font(.mono(13)).foregroundStyle(Color.kInk).frame(width: 110, alignment: .trailing)
                             Text(s.dueOn.date.formatted(.dateTime.day().month(.abbreviated))).font(.grotesk(12)).foregroundStyle(Color.kMuted)
                                 .frame(width: 80, alignment: .trailing)
-                            statusChip(s, txs: txs, today: today).frame(width: 120, alignment: .trailing)
+                            statusChip(s, payments: payments[s.uid] ?? [], today: today).frame(width: 120, alignment: .trailing)
                         }
                         .padding(.vertical, 10)
                     }
@@ -222,9 +225,10 @@ struct CardDetail: View {
         }
     }
 
-    private func statusChip(_ s: CardStatement, txs: [Entry], today: LocalDay) -> some View {
-        let (text, color): (String, Color) = switch Statements.status(s, txs, today: today) {
-        case .paid: (Statements.paidOn(s, txs).map { "Paid \($0.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "Paid", .kGrowth)
+    /// `payments`: the bill payments made against `s`.
+    private func statusChip(_ s: CardStatement, payments: [Entry], today: LocalDay) -> some View {
+        let (text, color): (String, Color) = switch Statements.status(s, payments, today: today) {
+        case .paid: (Statements.paidOn(s, payments).map { "Paid \($0.date.formatted(.dateTime.day().month(.abbreviated)))" } ?? "Paid", .kGrowth)
         case .partlyPaid: ("Part paid", .kAmber)
         case .overdue: ("Overdue", .kAlarm)
         case .due: ("Unpaid", .kAmber)
