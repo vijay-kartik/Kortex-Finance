@@ -64,6 +64,51 @@ struct LedgerTests {
         #expect(Statements.paidOn(statement, paid) == day(2026, 10, 14))
     }
 
+    /// The Cards page reads the card's ledger and each bill's own payments; they must agree with every transaction.
+    @Test func cardFiguresFromItsLedgerMatchEveryTransaction() {
+        func statement(_ uid: String, on: LocalDay, due: LocalDay, total: Int64) -> CardStatement {
+            CardStatement(uid: uid, cardUid: "card", periodStart: on.adding(days: -30), statementOn: on, dueOn: due,
+                          totalDueMinor: total, minDueMinor: 5_000, source: .auto, createdAtMillis: 0, updatedAtMillis: 0)
+        }
+        let august = statement("aug", on: day(2026, 8, 25), due: day(2026, 9, 15), total: 60_000)
+        let september = statement("sep", on: day(2026, 9, 25), due: day(2026, 10, 15), total: 140_000)
+        let txs = [
+            tx("o", .opening, 500_000, on: day(2026, 7, 1), from: "bank"),
+            tx("a", .expense, 60_000, on: day(2026, 8, 10), from: "card"),
+            tx("b", .expense, 140_000, on: day(2026, 9, 10), from: "card"),
+            tx("c", .expense, 4_250, on: day(2026, 9, 28), from: "card"),
+            tx("x", .expense, 9_999, on: day(2026, 9, 28), from: "other"),
+            tx("pa1", .cardPayment, 50_000, on: day(2026, 9, 12), from: "bank", to: "card", statement: "aug"),
+            tx("pa2", .cardPayment, 10_000, on: day(2026, 9, 14), from: "bank", to: "card", statement: "aug"),
+            tx("ps", .cardPayment, 40_000, on: day(2026, 10, 1), from: "bank", to: "card", statement: "sep"),
+            tx("px", .cardPayment, 9_999, on: day(2026, 10, 1), from: "bank", to: "other"),
+        ]
+        var data = FinanceData()
+        data.apply([bank, card, account("other", .creditCard)].map { RemoteRow.live($0) })
+        data.apply(txs.map { RemoteRow.live($0) })
+
+        let ledger = data.ledgerEntries(of: card)
+        #expect(Set(ledger.map(\.uid)) == Set(txs.filter { Balances.touches($0, card, accounts: data.accounts) }.map(\.uid)))
+        let position = Balances.cardPosition(card, outstandingMinor: data.balanceMinor(of: card))
+        let scanned = Balances.cardPosition(card, transactions: txs, accounts: data.accounts)
+        #expect(position.outstandingMinor == scanned.outstandingMinor)
+        #expect(position.availableMinor == scanned.availableMinor)
+        #expect(position.utilisation == scanned.utilisation)
+
+        let payments = Dictionary(grouping: ledger.filter { $0.type == .cardPayment }, by: \.statementUid)
+        let today = day(2026, 10, 2)
+        for s in [august, september] {
+            let own = payments[s.uid] ?? []
+            #expect(Statements.paidMinor(s, own) == Statements.paidMinor(s, txs))
+            #expect(Statements.status(s, own, today: today) == Statements.status(s, txs, today: today))
+            #expect(Statements.paidOn(s, own) == Statements.paidOn(s, txs))
+        }
+        #expect(Statements.paidOn(august, payments["aug"] ?? []) == day(2026, 9, 14))
+        #expect(Statements.status(september, payments["sep"] ?? [], today: today) == .partlyPaid)
+        #expect(Statements.spentSinceMinor(card, september, ledger, accounts: data.accounts)
+                == Statements.spentSinceMinor(card, september, txs, accounts: data.accounts))
+    }
+
     @Test func expensesPeriodNeverStepsPastToday() {
         let today = day(2026, 9, 29)
         var period = ExpensesPeriod.startingAt(today)

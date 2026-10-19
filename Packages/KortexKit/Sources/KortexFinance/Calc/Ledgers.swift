@@ -98,7 +98,11 @@ public extension Balances {
     }
 
     static func cardPosition(_ card: Account, transactions: [Transaction], accounts: [String: Account]) -> CardPosition {
-        let outstanding = balance(of: card, transactions: transactions, accounts: accounts)
+        cardPosition(card, outstandingMinor: balance(of: card, transactions: transactions, accounts: accounts))
+    }
+
+    /// As above, from an outstanding already worked out (`FinanceData.balanceMinor(of:)`).
+    static func cardPosition(_ card: Account, outstandingMinor outstanding: Int64) -> CardPosition {
         let limit = card.creditLimitMinor.flatMap { $0 > 0 ? $0 : nil }
         return CardPosition(
             outstandingMinor: outstanding,
