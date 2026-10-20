@@ -743,4 +743,43 @@ struct StatementImportTests {
         let s = StatementImportRules.prepare(bank([tx("2026-09-05", "UPI/RAHUL", 5_000, .debit, balance: nil, merchant: "Rahul")]), in: data, today: today)
         #expect(s.rows[0].kind == .expense && s.rows[0].replaces == nil)
     }
+
+    @Test func hugeAmountsAreComparedWithoutOverflowing() {
+        let huge = Double(Int64.max / 2) / 100
+        let data = withLoan(nextDueOn: "2026-10-05")
+        let s = StatementImportRules.prepare(bank([
+            tx("2026-08-05", "NACH HOME LOAN EMI ACH12345678", huge, .debit, balance: nil, merchant: "Home Loan EMI"),
+            tx("2026-09-05", "NACH HOME LOAN EMI ACH12345678", 0.01, .debit, balance: nil, merchant: "Home Loan EMI"),
+        ], opening: 0), in: data, today: today)
+        #expect(s.rows.map(\.amountMinor) == [StatementImportRules.minor(huge), 1])
+        #expect(s.rows.allSatisfy { $0.mandateRef == nil }, "amounts that far apart aren't one mandate")
+        #expect(StatementImportRules.suggestRepeats(s.rows, hints: [true, true], in: data).count == 2)
+    }
+
+    @Test func typedAmountsBeyondPaiseAreRejected() {
+        #expect(StatementImportRules.typedMinor(1_234.5) == 123_450)
+        #expect(StatementImportRules.typedMinor(-500) == -50_000)
+        #expect(StatementImportRules.typedMinor(99_999_999_999_999_999_999) == nil)
+        #expect(StatementImportRules.typedMinor(-99_999_999_999_999_999_999) == nil)
+        #expect(StatementImportRules.typedMinor(.infinity) == nil && StatementImportRules.typedMinor(.nan) == nil)
+        #expect(StatementImportRules.typedMinor(Double(StatementImportRules.largestTypedMinor) / 100) == StatementImportRules.largestTypedMinor)
+        #expect(StatementImportRules.typedMinor(Double(StatementImportRules.largestTypedMinor) / 100 + 1) == nil)
+    }
+
+    @Test func aRowEditedToNoAmountIsLeftOutAndNeverSaved() {
+        var s = StatementImportRules.prepare(bank([
+            tx("2026-09-02", "UPI/Swiggy", 250, .debit, balance: nil, merchant: "Swiggy"),
+            tx("2026-09-03", "ATM", 500, .debit, balance: nil),
+        ]), in: FinanceData(), today: today)
+        s.setAmount(0, forRow: 0)
+        s.setAmount(-50_000, forRow: 1)
+        #expect(s.rows.allSatisfy { !$0.include && $0.issue == "No amount was read." })
+        s.setAmount(30_000, forRow: 0)
+        #expect(s.rows[0].amountMinor == 30_000 && s.rows[0].issue == nil)
+
+        s.rows[1].include = true
+        guard case .failure(.invalidAmount) = StatementImportRules.commit(s, in: FinanceData(), clock: clock) else {
+            Issue.record("an included row of −₹500 was saved"); return
+        }
+    }
 }

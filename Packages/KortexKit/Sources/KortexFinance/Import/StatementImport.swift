@@ -219,6 +219,18 @@ public struct StatementImport: Sendable {
         )
     }
 
+    /// A row's amount as corrected in the review. Zero or less leaves it out, as `prepare` does.
+    public mutating func setAmount(_ minor: Int64, forRow id: Int) {
+        guard let i = rows.firstIndex(where: { $0.id == id }) else { return }
+        rows[i].amountMinor = minor
+        if minor <= 0 {
+            rows[i].include = false
+            rows[i].issue = "No amount was read."
+        } else {
+            rows[i].issue = nil
+        }
+    }
+
     /// Marks a row as one-off or recurring, and every other expense that's the same payment with it:
     /// marking one Netflix row marks them all.
     public mutating func setRepeats(_ repeats: ImportRepeats, forRow id: Int) {
@@ -502,6 +514,18 @@ public enum StatementImportRules {
         Int64((Decimal(rupees) * 100 as NSDecimalNumber).rounding(accordingToBehavior:
             NSDecimalNumberHandler(roundingMode: .plain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false,
                                    raiseOnUnderflow: false, raiseOnDivideByZero: false)).int64Value)
+    }
+
+    /// The most an amount typed in the review may be: ₹1 lakh crore. Far beyond any statement, and
+    /// small enough that a statement's rows add up without overflowing.
+    public static let largestTypedMinor: Int64 = 10_000_000_000_000
+
+    /// An amount typed in the review, in rupees, as paise. Nil when it isn't a number or is beyond
+    /// `largestTypedMinor` either way (a long reference number pasted in).
+    public static func typedMinor(_ rupees: Double) -> Int64? {
+        let paise = (rupees * 100).rounded()
+        guard paise.isFinite, abs(paise) <= Double(largestTypedMinor) else { return nil }
+        return Int64(paise)
     }
 
     static func parseDay(_ text: String?) -> LocalDay? { text.flatMap(LocalDay.init) }
@@ -883,8 +907,9 @@ public enum StatementImportRules {
         }
     }
 
+    /// Compared as `Double`, so amounts far apart can't overflow; exact for any real amount.
     private static func similar(_ a: Int64, _ b: Int64, percent: Int64) -> Bool {
-        abs(a - b) * 100 <= max(a, b) * percent
+        abs(Double(a) - Double(b)) * 100 <= Double(max(a, b)) * Double(percent)
     }
 
     private static func words(_ text: String) -> Set<String> {
@@ -1008,6 +1033,7 @@ public enum StatementImportRules {
 
         var merchants: [String: Merchant] = [:]
         for row in draft.rows where row.include {
+            guard row.amountMinor > 0 else { return .failure(.invalidAmount) }
             let isPayment = row.kind == .cardPayment
             let isCard = draft.account.kind == .creditCard
             if isPayment && !isCard && row.cardUid == nil { return .failure(.cardPaymentNeedsCard) }
