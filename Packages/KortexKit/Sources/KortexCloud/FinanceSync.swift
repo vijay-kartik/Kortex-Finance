@@ -139,8 +139,11 @@ public final class FinanceSync: FinanceStore {
         write(ResetRules.eraseAll(live))
         receipts.remove(data.transactions.values.compactMap { $0.receipt?.photoDevicePath })
         receipts.removeAll()
+        ReceiptDrops.temporary.removeAll()
     }
 
+    /// Also runs at launch, as the first sign-in state arrives, so it clears receipt drops left by
+    /// a quit or crash with the sheet open.
     public func stop() {
         retries.values.forEach { $0.cancel() }
         retries = [:]

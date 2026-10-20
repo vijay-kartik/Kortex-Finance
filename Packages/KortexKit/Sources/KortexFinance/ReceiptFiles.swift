@@ -98,6 +98,42 @@ public final class MemoryReceiptFiles: ReceiptFiles {
     public func exists(_ path: String) -> Bool { kept[path] != nil }
 }
 
+/// Copies of dropped and Continuity Camera receipts, in their own temporary folder so they can be
+/// cleared as a group. The receipt sheet's copy goes when the sheet does (the store has kept its
+/// own by then), and the whole folder on launch, sign-out and Reset Data.
+public struct ReceiptDrops: Sendable {
+    public let folder: URL
+
+    public static let temporary = ReceiptDrops(folder: FileManager.default.temporaryDirectory.appendingPathComponent("ReceiptDrops", isDirectory: true))
+
+    public init(folder: URL) {
+        self.folder = folder.standardizedFileURL
+    }
+
+    /// A copy of `file` in the folder, under a new name. Nil when it can't be copied.
+    public func copy(_ file: URL) -> URL? {
+        let fm = FileManager.default
+        let target = folder.appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(file.pathExtension.isEmpty ? "jpg" : file.pathExtension)
+        do {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            try fm.copyItem(at: file, to: target)
+        } catch { return nil }
+        return target
+    }
+
+    /// Removes `file` if it's one of the folder's copies. Anything else (a file chosen in the open
+    /// panel) is the user's own and stays.
+    public func discard(_ file: URL) {
+        guard file.standardizedFileURL.deletingLastPathComponent().path == folder.path else { return }
+        try? FileManager.default.removeItem(at: file)
+    }
+
+    public func removeAll() {
+        try? FileManager.default.removeItem(at: folder)
+    }
+}
+
 extension ReceiptImage {
     /// The extension an image is kept under, and its MIME type.
     static func kind(of file: URL) -> (ext: String, mime: String) {

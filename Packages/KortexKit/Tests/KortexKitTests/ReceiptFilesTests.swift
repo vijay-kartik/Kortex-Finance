@@ -142,4 +142,34 @@ struct ReceiptFilesTests {
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(ReceiptFolder(userUid: nil, root: root).place(try source(in: root), for: "tx1") == nil)
     }
+
+    // MARK: ReceiptDrops
+
+    @Test func dropsDiscardOnlyTheirOwnCopies() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = try source(in: root)
+        let drops = ReceiptDrops(folder: root.appendingPathComponent("ReceiptDrops", isDirectory: true))
+
+        let copy = try #require(drops.copy(file))
+        #expect(copy.deletingLastPathComponent().standardizedFileURL.path == drops.folder.path)
+        #expect(copy.pathExtension == "png")
+
+        drops.discard(file)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        drops.discard(copy)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test func dropsRemoveAllEmptiesTheFolder() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = try source(in: root)
+        let drops = ReceiptDrops(folder: root.appendingPathComponent("ReceiptDrops", isDirectory: true))
+        let copies = [try #require(drops.copy(file)), try #require(drops.copy(file))]
+
+        drops.removeAll()
+        #expect(copies.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
 }
