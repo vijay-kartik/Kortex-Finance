@@ -23,7 +23,12 @@ public final class AppModel {
     public var reportPeriod = ExpensesPeriod.startingAt(.today())
 
     /// The sheet over the window, if any.
-    public var sheet: Sheet?
+    public var sheet: Sheet? {
+        didSet {
+            // A dropped receipt's copy goes with its sheet; Save and Attach have had the store keep its own by then.
+            if case .receipt(let file)? = oldValue, sheet != oldValue { ReceiptDrops.temporary.discard(file) }
+        }
+    }
 
     public init() {}
 

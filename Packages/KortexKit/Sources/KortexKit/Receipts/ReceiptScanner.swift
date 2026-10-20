@@ -1,4 +1,5 @@
 import AppKit
+import KortexFinance
 import PDFKit
 import UniformTypeIdentifiers
 import Vision
@@ -111,9 +112,6 @@ enum ReceiptInput {
     private static func copyToTemp(_ url: URL) -> URL? {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
-        let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension(url.pathExtension.isEmpty ? "jpg" : url.pathExtension)
-        do { try FileManager.default.copyItem(at: url, to: target) } catch { return nil }
-        return target
+        return ReceiptDrops.temporary.copy(url)
     }
 }

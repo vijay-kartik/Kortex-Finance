@@ -96,6 +96,9 @@ has some), grouping words into printed rows; `KortexFinance.ReceiptParser` is a 
 and the entry carries that path, as the phone does; images are never uploaded. The files belong to the
 store (`KortexFinance.ReceiptFiles`, reached through `FinanceStore.receipts`): an image is copied only
 once the rules accept its entry, and goes when the entry is deleted or its receipt replaced.
+A dropped or Continuity Camera receipt is first copied to tmp/ReceiptDrops (`KortexFinance.ReceiptDrops`);
+that copy is deleted when its sheet closes, and the folder is emptied at launch, sign-out and Reset Data.
+A file chosen with Scan Receipt… is the user's own and is never deleted.
 
 ## Import a statement (Mac only)
 
