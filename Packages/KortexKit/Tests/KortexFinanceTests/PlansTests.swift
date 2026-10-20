@@ -29,8 +29,24 @@ struct PlansTests {
         let fortnightly = recurring("x", .fixed, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5), interval: 2)
         #expect(RecurringSchedule.frequencyLabel(fortnightly) == "every 2 weeks")
         #expect(RecurringSchedule.repeatsLabel(fortnightly) == "Every 2 weeks")
+        #expect(RecurringSchedule.repeatsLabel(.yearly, interval: 1) == "Every year")
+        #expect(Frequency.monthly.unit == "month")
         #expect(RecurringSchedule.reminderLabel(-1) == "Off")
         #expect(RecurringSchedule.reminderLabel(0) == "On the day")
+    }
+
+    @Test func pendingSubtitles() {
+        func item(_ kind: PendingKind, min: Int64? = nil) -> PendingItem {
+            PendingItem(kind: kind, sourceUid: "x", title: "x", amountMinor: 1, dueOn: day(2026, 10, 5), minDueMinor: min)
+        }
+        let fortnightly = recurring("x", .subscription, .weekly, amount: 1, anchor: 1, next: day(2026, 10, 5), interval: 2)
+        let monthly = recurring("x", .fixed, .monthly, amount: 1, anchor: 5, next: day(2026, 10, 5))
+        #expect(Pending.subtitle(item(.cardBill, min: 120_000), recurring: nil) == "Card bill · min ₹1,200")
+        #expect(Pending.subtitle(item(.cardBill), recurring: nil) == "Card bill")
+        #expect(Pending.subtitle(item(.subscription), recurring: fortnightly) == "Subscription · every 2 weeks")
+        #expect(Pending.subtitle(item(.fixed), recurring: monthly) == "Fixed · monthly")
+        #expect(Pending.subtitle(item(.subscription), recurring: nil) == "Subscription", "no trailing separator")
+        #expect(RecurringKind.subscription.pendingKind == .subscription && RecurringKind.fixed.pendingKind == .fixed)
     }
 
     @Test func calendarDueDaysCoverWeeklyOccurrencesAndUnpaidBills() {

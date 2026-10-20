@@ -178,7 +178,7 @@ struct RecurringView: View {
             Text(EntryFormat.account(r.accountUid, data)).font(.grotesk(12)).foregroundStyle(Color.kMuted).lineLimit(1)
                 .frame(width: 150, alignment: .leading)
             Text(r.paused ? "Paused" : Format.dueDay(r.nextDueOn)).font(.grotesk(12))
-                .foregroundStyle(r.paused ? Color.kMuted : urgency == .overdue ? Color.kAlarm : urgency == .soon ? Color.kAmber : Color.kMuted)
+                .foregroundStyle(r.paused ? Color.kMuted : urgency.color)
                 .frame(width: 110, alignment: .trailing)
             Text(Money.format(r.amountMinor, currency: r.currency, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
                 .frame(width: 90, alignment: .trailing)

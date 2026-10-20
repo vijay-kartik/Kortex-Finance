@@ -111,7 +111,7 @@ public enum Pending {
         let occurrences: [PendingItem] = recurring.flatMap { payment in
             RecurringSchedule.occurrences(payment, until: until)
                 .filter { !paid.contains(Occurrence(uid: payment.uid, dueOn: $0)) }
-                .map { PendingItem(kind: payment.kind == .subscription ? .subscription : .fixed, sourceUid: payment.uid,
+                .map { PendingItem(kind: payment.kind.pendingKind, sourceUid: payment.uid,
                                    title: payment.name, amountMinor: payment.amountMinor, dueOn: $0, minDueMinor: nil) }
         }
         return PendingSummary(

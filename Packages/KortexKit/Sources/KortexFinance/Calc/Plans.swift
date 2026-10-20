@@ -22,15 +22,15 @@ public extension RecurringSchedule {
 
     /// "monthly", "every 2 weeks".
     static func frequencyLabel(_ r: Recurring) -> String {
-        let unit = switch r.frequency { case .weekly: "week"; case .monthly: "month"; case .yearly: "year" }
-        if r.interval > 1 { return "every \(r.interval) \(unit)s" }
+        if r.interval > 1 { return "every \(r.interval) \(r.frequency.unit)s" }
         return switch r.frequency { case .weekly: "weekly"; case .monthly: "monthly"; case .yearly: "yearly" }
     }
 
     /// "Every month", "Every 2 weeks".
-    static func repeatsLabel(_ r: Recurring) -> String {
-        let unit = switch r.frequency { case .weekly: "week"; case .monthly: "month"; case .yearly: "year" }
-        return r.interval > 1 ? "Every \(r.interval) \(unit)s" : "Every \(unit)"
+    static func repeatsLabel(_ r: Recurring) -> String { repeatsLabel(r.frequency, interval: r.interval) }
+
+    static func repeatsLabel(_ frequency: Frequency, interval: Int) -> String {
+        interval > 1 ? "Every \(interval) \(frequency.unit)s" : "Every \(frequency.unit)"
     }
 
     static func reminderLabel(_ days: Int) -> String {
@@ -41,6 +41,17 @@ public extension RecurringSchedule {
         default: "\(days) days before"
         }
     }
+}
+
+public extension Frequency {
+    /// "week", "month", "year".
+    var unit: String {
+        switch self { case .weekly: "week"; case .monthly: "month"; case .yearly: "year" }
+    }
+}
+
+public extension RecurringKind {
+    var pendingKind: PendingKind { self == .subscription ? .subscription : .fixed }
 }
 
 public extension Spending {
@@ -59,12 +70,24 @@ public extension Pending {
         var days: [LocalDay: [PendingKind]] = [:]
         for r in recurring {
             for day in RecurringSchedule.occurrences(r, until: month.lastDay, limit: 400) where day >= month.firstDay {
-                days[day, default: []].append(r.kind == .subscription ? .subscription : .fixed)
+                days[day, default: []].append(r.kind.pendingKind)
             }
         }
         for s in Statements.latestPerCard(statements) where Statements.unpaidMinor(s, txs) > 0 && s.dueOn.isWithin(month.firstDay, month.lastDay) {
             days[s.dueOn, default: []].append(.cardBill)
         }
         return days
+    }
+
+    /// A pending row's second line: "Card bill · min ₹1,200", "Subscription · every 2 weeks", or just
+    /// "Subscription" when the recurring payment isn't loaded.
+    static func subtitle(_ item: PendingItem, recurring: Recurring?) -> String {
+        switch item.kind {
+        case .cardBill:
+            return item.minDueMinor.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
+        case .subscription, .fixed:
+            let kind = item.kind == .subscription ? "Subscription" : "Fixed"
+            return [kind, recurring.map(RecurringSchedule.frequencyLabel)].compactMap { $0 }.joined(separator: " · ")
+        }
     }
 }

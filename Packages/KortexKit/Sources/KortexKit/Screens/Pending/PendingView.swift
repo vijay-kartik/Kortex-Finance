@@ -202,14 +202,10 @@ struct PendingView: View {
         let recurring = data.recurring[item.sourceUid]
         let card = item.kind == .cardBill ? data.accounts[item.title] : nil
         let title = card.map { c in c.last4.map { "\(c.name) ••\($0)" } ?? c.name } ?? item.title
-        let subtitle: String = switch item.kind {
-        case .cardBill: item.minDueMinor.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
-        case .subscription: "Subscription · \(recurring.map(RecurringSchedule.frequencyLabel) ?? "")"
-        case .fixed: "Fixed · \(recurring.map(RecurringSchedule.frequencyLabel) ?? "")"
-        }
+        let subtitle = Pending.subtitle(item, recurring: recurring)
         // A card bill is paid from whichever account you choose when paying it.
         let paysFrom = item.kind == .cardBill ? "—" : EntryFormat.account(recurring?.accountUid, data)
-        let dueText = urgency == .overdue ? "Overdue · \(Format.dueDay(item.dueOn))" : Format.dueDay(item.dueOn)
+        let dueText = Format.dueText(item.dueOn, urgency: urgency)
         return HStack(spacing: 12) {
             Image(systemName: item.kind == .cardBill ? "creditcard" : item.kind == .subscription ? "play.rectangle" : "house")
                 .font(.system(size: 12))
@@ -225,7 +221,7 @@ struct PendingView: View {
             Text(paysFrom).font(.grotesk(12)).foregroundStyle(Color.kMuted).lineLimit(1)
                 .frame(width: 150, alignment: .leading)
             Text(dueText).font(.grotesk(12))
-                .foregroundStyle(urgency == .overdue ? Color.kAlarm : urgency == .soon ? Color.kAmber : Color.kMuted)
+                .foregroundStyle(urgency.color)
                 .frame(width: 120, alignment: .trailing)
             Text(Money.format(item.amountMinor, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
                 .frame(width: 100, alignment: .trailing)

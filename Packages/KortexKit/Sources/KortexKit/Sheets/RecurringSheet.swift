@@ -56,7 +56,7 @@ struct RecurringSheet: View {
                     Text("Every month").tag(Frequency.monthly)
                     Text("Every year").tag(Frequency.yearly)
                 }
-                Stepper("Every \(draft.interval) \(unit)\(draft.interval == 1 ? "" : "s")", value: $draft.interval, in: 1...12)
+                Stepper(RecurringSchedule.repeatsLabel(draft.frequency, interval: draft.interval), value: $draft.interval, in: 1...12)
                 DatePicker("Next due", selection: $dueDate, displayedComponents: .date)
                 AccountPicker(label: "Paid from", selection: $draft.accountUid, accounts: accounts)
                 Picker("Category", selection: $draft.categoryUid) {
@@ -70,10 +70,6 @@ struct RecurringSheet: View {
                 if editing != nil { Toggle("Paused", isOn: $draft.paused) }
             }
         }
-    }
-
-    private var unit: String {
-        switch draft.frequency { case .weekly: "week"; case .monthly: "month"; case .yearly: "year" }
     }
 
     private func save() {
