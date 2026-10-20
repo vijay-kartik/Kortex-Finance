@@ -315,6 +315,13 @@ extension Color {
     }
 }
 
+extension DueUrgency {
+    /// A due date's colour: Alarm once past due, Amber when soon, Muted otherwise.
+    var color: Color {
+        switch self { case .overdue: .kAlarm; case .soon: .kAmber; case .later: .kMuted }
+    }
+}
+
 enum Format {
     /// "September".
     static func monthName(_ month: YearMonth) -> String {
@@ -329,6 +336,11 @@ enum Format {
     /// "Sat, 3 Oct".
     static func dueDay(_ day: LocalDay) -> String {
         day.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+    }
+
+    /// "Sat, 3 Oct", or "Overdue · Sat, 3 Oct" once it's past due.
+    static func dueText(_ day: LocalDay, urgency: DueUrgency) -> String {
+        urgency == .overdue ? "Overdue · \(dueDay(day))" : dueDay(day)
     }
 
     /// "Tuesday, 29 September".

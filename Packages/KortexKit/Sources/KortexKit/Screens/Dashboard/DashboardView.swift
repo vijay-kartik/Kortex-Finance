@@ -214,14 +214,14 @@ struct PendingCard: View {
         return HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title(item)).font(.grotesk(13, .medium)).foregroundStyle(Color.kInk).lineLimit(1).help(title(item))
-                Text(subtitle(item)).font(.grotesk(11)).foregroundStyle(Color.kMuted)
+                Text(Pending.subtitle(item, recurring: data.recurring[item.sourceUid])).font(.grotesk(11)).foregroundStyle(Color.kMuted)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(Money.format(item.amountMinor, wholeUnits: true)).font(.mono(13)).foregroundStyle(Color.kInk)
-                Text(urgency == .overdue ? "Overdue · \(Format.dueDay(item.dueOn))" : Format.dueDay(item.dueOn))
+                Text(Format.dueText(item.dueOn, urgency: urgency))
                     .font(.grotesk(11))
-                    .foregroundStyle(urgency == .overdue ? Color.kAlarm : urgency == .soon ? Color.kAmber : Color.kMuted)
+                    .foregroundStyle(urgency.color)
             }
         }
     }
@@ -229,23 +229,6 @@ struct PendingCard: View {
     private func title(_ item: PendingItem) -> String {
         guard item.kind == .cardBill, let card = data.accounts[item.title] else { return item.title }
         return card.last4.map { "\(card.name) ••\($0)" } ?? card.name
-    }
-
-    private func subtitle(_ item: PendingItem) -> String {
-        switch item.kind {
-        case .cardBill:
-            return item.minDueMinor.map { "Card bill · min \(Money.format($0, wholeUnits: true))" } ?? "Card bill"
-        case .subscription, .fixed:
-            let kind = item.kind == .subscription ? "Subscription" : "Fixed"
-            let frequency = data.recurring[item.sourceUid].map { r -> String in
-                switch r.frequency {
-                case .weekly: r.interval == 1 ? "weekly" : "every \(r.interval) weeks"
-                case .monthly: r.interval == 1 ? "monthly" : "every \(r.interval) months"
-                case .yearly: r.interval == 1 ? "yearly" : "every \(r.interval) years"
-                }
-            }
-            return [kind, frequency].compactMap { $0 }.joined(separator: " · ")
-        }
     }
 }
 
