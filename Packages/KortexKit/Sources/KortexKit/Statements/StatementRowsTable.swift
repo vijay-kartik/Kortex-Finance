@@ -225,12 +225,17 @@ struct StatementRowsTable: View {
     }
 
     private func amountBinding(_ row: ImportRow) -> Binding<Double> {
-        Binding(get: { Double(index(row).map { draft.rows[$0].amountMinor } ?? row.amountMinor) / 100 },
-                set: { if let i = index(row) {
-                    draft.rows[i].amountMinor = Int64(($0 * 100).rounded())
-                    draft.rows[i].issue = nil
-                } })
+        rupeesBinding(get: { index(row).map { draft.rows[$0].amountMinor } ?? row.amountMinor },
+                      set: { draft.setAmount($0, forRow: row.id) })
     }
+}
+
+/// An amount in the review, typed in rupees and kept in paise. A value that can't be an amount (a
+/// long reference number pasted in) is ignored, so the field goes back to what it was.
+@MainActor
+func rupeesBinding(get: @escaping @MainActor () -> Int64, set: @escaping @MainActor (Int64) -> Void) -> Binding<Double> {
+    Binding(get: { Double(get()) / 100 },
+            set: { if let minor = StatementImportRules.typedMinor($0) { set(minor) } })
 }
 
 /// Whether a row is already in Kortex, when importing into an account you have. The tooltip names the entry.

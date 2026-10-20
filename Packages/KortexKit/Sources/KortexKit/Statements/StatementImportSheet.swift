@@ -373,8 +373,7 @@ struct StatementImportSheet: View {
             HStack {
                 Text(isCard ? "Owed at start" : "Opening balance")
                 Spacer()
-                TextField("", value: Binding(get: { Double(draft!.openingMinor) / 100 },
-                                            set: { draft!.openingMinor = Int64(($0 * 100).rounded()) }),
+                TextField("", value: rupeesBinding(get: { draft!.openingMinor }, set: { draft!.openingMinor = $0 }),
                           format: .number.precision(.fractionLength(2)))
                     .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 120)
             }
