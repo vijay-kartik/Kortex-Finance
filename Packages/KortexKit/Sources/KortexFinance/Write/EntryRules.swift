@@ -299,6 +299,23 @@ public enum EntryRules {
                                     statementUid: statement.uid), in: data, clock: clock)
     }
 
+    /// Accounts a card bill can be paid from: anything but a credit card, debit cards included, oldest
+    /// first. As kortex's `PayBillState.accounts`.
+    public static func billPaymentAccounts(in data: FinanceData) -> [Account] {
+        data.accounts.values.filter { !$0.archived && $0.kind != .creditCard }
+            .sorted { ($0.createdAtMillis, $0.uid) < ($1.createdAtMillis, $1.uid) }
+    }
+
+    /// Where Pay card bill starts: the account this card's bill was last paid from, else the first bank
+    /// account, else the first of `billPaymentAccounts`. As kortex's `PayBillState.defaultFrom`.
+    public static func defaultBillPaymentAccount(cardUid: String, in data: FinanceData) -> String? {
+        let options = billPaymentAccounts(in: data)
+        let last = data.transactions.values.filter { $0.type == .cardPayment && $0.toAccountUid == cardUid }
+            .max { ($0.occurredAtMillis, $0.uid) < ($1.occurredAtMillis, $1.uid) }?.accountUid
+        if let last, options.contains(where: { $0.uid == last }) { return last }
+        return (options.first { $0.kind == .bank } ?? options.first)?.uid
+    }
+
     /// Scan receipt 05: the receipt joins an expense already saved; nothing is counted twice.
     public static func attachReceipt(_ receipt: Receipt, to uid: String, in data: FinanceData, clock: FinanceClock = .system) -> Result<Change, FinanceError> {
         guard var tx = data.transactions[uid] else { return .failure(.notFound) }
