@@ -20,9 +20,8 @@ struct PayBillSheet: View {
         self.finance = finance
         self.statementUid = statementUid
         self.close = close
-        let banks = finance.data.accounts.values.filter { !$0.archived && $0.kind != .creditCard && !$0.kind.isCard }
-            .sorted { $0.createdAtMillis < $1.createdAtMillis }
-        _fromUid = State(initialValue: banks.first?.uid ?? "")
+        let cardUid = finance.data.statements[statementUid]?.cardUid ?? ""
+        _fromUid = State(initialValue: EntryRules.defaultBillPaymentAccount(cardUid: cardUid, in: finance.data) ?? "")
     }
 
     var body: some View {
@@ -32,7 +31,7 @@ struct PayBillSheet: View {
         let unpaid = statement.map { Statements.unpaidMinor($0, txs) } ?? 0
         let minimum = statement.map { max($0.minDueMinor - Statements.paidMinor($0, txs), 0) } ?? 0
         let card = statement.flatMap { data.accounts[$0.cardUid] }
-        let from = data.accounts.values.filter { !$0.archived && !$0.kind.isCard }.sorted { $0.createdAtMillis < $1.createdAtMillis }
+        let from = EntryRules.billPaymentAccounts(in: data)
 
         SheetChrome(
             title: "Pay card bill",

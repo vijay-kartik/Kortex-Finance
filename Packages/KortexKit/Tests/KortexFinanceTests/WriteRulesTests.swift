@@ -289,6 +289,50 @@ struct WriteRulesTests {
         #expect(gone == "unknown")
     }
 
+    @Test func payingACardBillStartsWhereItWasLastPaidFromElseTheFirstBank() {
+        var data = FinanceData()
+        func at(_ uid: String, _ kind: AccountKind, created: Int64, archived: Bool = false) -> RemoteRow<Account> {
+            var a = account(uid, kind)
+            a.createdAtMillis = created
+            a.archived = archived
+            return .live(a)
+        }
+        // Cash and a wallet added before the banks, as onboarding often goes.
+        data.apply([at("cash", .cash, created: 1), at("wallet", .wallet, created: 2), at("hdfc", .bank, created: 3),
+                    at("sbi", .bank, created: 4), at("debit", .debitCard, created: 5), at("card", .creditCard, created: 6),
+                    at("other", .creditCard, created: 7), at("old", .bank, created: 0, archived: true)])
+        func paid(_ uid: String, from: String, to: String = "card", _ millis: Int64) -> RemoteRow<Transaction> {
+            .live(Transaction(uid: uid, type: .cardPayment, amountMinor: 1_000, currency: "INR", occurredAtMillis: millis,
+                              occurredOn: day(2026, 9, 1), accountUid: from, toAccountUid: to, categoryUid: nil, merchant: nil,
+                              payeeKey: nil, note: nil, source: .manual, sourceRef: nil, recurringUid: nil, dueOn: nil,
+                              statementUid: nil, receipt: nil, createdAtMillis: 0, updatedAtMillis: 0))
+        }
+        let from = { EntryRules.defaultBillPaymentAccount(cardUid: "card", in: data) }
+
+        // Anything but a credit card, debit cards included, oldest first; archived ones aren't offered.
+        #expect(EntryRules.billPaymentAccounts(in: data).map(\.uid) == ["cash", "wallet", "hdfc", "sbi", "debit"])
+        // Never paid: the first bank, though cash and the wallet are older.
+        #expect(from() == "hdfc")
+        // The account this card was last paid from; another card's payments don't count.
+        data.apply([paid("p1", from: "hdfc", 100), paid("p2", from: "sbi", 200), paid("p3", from: "cash", to: "other", 300)])
+        #expect(from() == "sbi")
+        data.apply([paid("p4", from: "debit", 400)])
+        #expect(from() == "debit")
+        // Last paid from an archived, deleted or unknown account: back to the first bank.
+        data.apply([paid("p5", from: "old", 500)])
+        #expect(from() == "hdfc")
+        data.apply([RemoteRow<Account>.deleted(uid: "debit")])
+        data.apply([paid("p5", from: "debit", 500)])
+        #expect(from() == "hdfc")
+        data.apply([paid("p5", from: FinanceIds.unknownAccount, 500)])
+        #expect(from() == "hdfc")
+        // No bank left: the first account offered; none at all: nothing.
+        data.apply([RemoteRow<Account>.deleted(uid: "hdfc"), .deleted(uid: "sbi")])
+        #expect(from() == "cash")
+        data.apply([RemoteRow<Account>.deleted(uid: "cash"), .deleted(uid: "wallet")])
+        #expect(from() == nil)
+    }
+
     @Test func whatDeletedAccountsLeaveBehindGoesWithoutMovingYourBalances() throws {
         var data = sample()   // "bank" and "card" stay
         data.apply([RemoteRow.live(account("old", .bank)), .live(account("oldCard", .creditCard))])
